@@ -56,15 +56,59 @@ O projeto segue estritamente as diretrizes de arquitetura, segurança e convenç
 
 ---
 
+## 🚀 Como Executar o Ambiente Local
+
+### 1. Configurar o arquivo `.env`
+Copie o modelo de exemplo e defina suas credenciais locais:
+```bash
+cp .env.example .env
+```
+
+### 2. Iniciar o Banco de Dados e MCP via Docker Compose
+Suba os containers do PostgreSQL 18 e do MCP Server em segundo plano:
+```bash
+docker compose up -d
+```
+
+Para verificar o status e o healthcheck:
+```bash
+docker compose ps
+```
+
+### 3. Conexão do MCP no VSCode
+Adicione a configuração no seu cliente MCP / VSCode para inspecionar o banco diretamente pelo container:
+```json
+{
+  "mcpServers": {
+    "postgres": {
+      "command": "docker",
+      "args": [
+        "exec",
+        "-i",
+        "player_scout_postgres_mcp",
+        "npx",
+        "-y",
+        "@modelcontextprotocol/server-postgres",
+        "postgresql://postgres:sua_senha@postgres:5432/playerscout_dev"
+      ]
+    }
+  }
+}
+```
+
+---
+
 ## 📁 Estrutura do Repositório
 
 ```text
 player-scout/
-├── AGENTS.md        # Instruções e diretrizes centrais dos especialistas
-├── ROADMAP.md       # Roteiro de fases, status atual e acompanhamento
-├── CHANGELOG.md     # Histórico detalhado de mudanças e commits
-├── README.md        # Esta documentação geral
-└── rust/            # Código-fonte do backend e testes em Rust (a ser criado)
+├── AGENTS.md            # Instruções e diretrizes centrais dos especialistas
+├── ROADMAP.md           # Roteiro de fases, status atual e acompanhamento
+├── CHANGELOG.md         # Histórico detalhado de mudanças e commits
+├── README.md            # Esta documentação geral
+├── docker-compose.yml   # PostgreSQL 18 e serviço MCP containerizado
+├── migrations/          # Migrações relacionais do PostgreSQL
+└── rust/                # Código-fonte do backend e testes em Rust (a ser criado)
 ```
 
 ---
