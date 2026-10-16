@@ -8,8 +8,8 @@ Este arquivo é a fonte oficial do estado de evolução do projeto. Toda fase e 
 
 | Fase | Descrição | Status | Progresso |
 | :--- | :--- | :---: | :---: |
-| **Fase 0** | Definições de Domínio, Wireframes & Documentação | **Em Andamento** | 90% |
-| **Fase 1** | Banco de Dados PostgreSQL 18+ & Modelagem com Toasty ORM | **Pendente** | 0% |
+| **Fase 0** | Definições de Domínio, Wireframes & Documentação | **Concluído** | 100% |
+| **Fase 1** | Banco de Dados PostgreSQL 18+ & Modelagem com Toasty ORM | **Em Andamento** | 80% |
 | **Fase 2** | Backend Rust (Axum, API REST & Ingestão em Quadra) | **Pendente** | 0% |
 | **Fase 3** | Motor Analítico, Agregação Recursiva & Modo Comparativo | **Pendente** | 0% |
 | **Fase 4** | Frontend Web (Askama, HTMX 4.x, Chart.js & Mobile Touch) | **Pendente** | 0% |
@@ -35,23 +35,26 @@ Este arquivo é a fonte oficial do estado de evolução do projeto. Toda fase e 
 - [x] Definição de requisitos de ergonomia: foco em Celular e Tablet, sem teclas de atalho, com botões primários na *Thumb Zone*.
 - [x] Arquitetura de design responsivo e recursivo (drill-down estruturado).
 - [x] Definição da stack: Rust Axum, Askama, Toasty ORM, PostgreSQL 18+, HTMX 4.x e Chart.js.
-- [~] Atualização da documentação do repositório (`README.md`, `ROADMAP.md` e `CHANGELOG.md`). 📍 **ETAPA ATUAL**
+- [x] Atualização da documentação do repositório (`README.md`, `ROADMAP.md` e `CHANGELOG.md`).
 
 ---
 
 ### Fase 1: Banco de Dados PostgreSQL 18+ & Modelagem com Toasty ORM
-- [ ] Configuração do ambiente PostgreSQL 18+ e verificação de conectividade.
-- [ ] Definição dos schemas e tabelas relacionais:
+- [x] Configuração do ambiente PostgreSQL 18+ com healthcheck e ponto de montagem compatível (`/var/lib/postgresql`).
+- [x] Inclusão do serviço containerizado `postgres-mcp` (Node 22) no `docker-compose.yml`.
+- [x] Definição dos schemas e tabelas relacionais via migração `001_initial_schema.sql`:
   - `coaches` (dados do treinador).
   - `players` (dados do atleta, mão dominante, lado preferido na quadra).
   - `tournaments` (torneios e eventos).
   - `matches` (partidas, adversários, data, status).
   - `shot_events` (eventos individuais de jogadas com set, tipo de golpe, resultado, decisão, tags especiais).
-- [ ] Criação das constraints de integridade:
+- [x] Criação e validação das constraints de integridade:
   - `CHECK (special_tag != 'unforced_error' OR outcome = 'miss')`
   - `CHECK (special_tag != 'winner' OR outcome = 'hit')`
-- [ ] Criação dos índices compostos para agregação rápida por partida/set e por range de datas do jogador.
-- [ ] Configuração e mapeamento das entidades usando o ORM **Toasty** (`tokio-rs/toasty`).
+  - `CHECK (set_number >= 1 AND set_number <= 5)`
+  - Padrão `good` para qualidade de decisão.
+- [x] Criação dos índices compostos para agregação rápida por partida/set e por range de datas do jogador.
+- [~] Configuração e mapeamento das entidades usando o ORM **Toasty** (`tokio-rs/toasty`) no backend Rust. 📍 **ETAPA ATUAL**
 
 ---
 

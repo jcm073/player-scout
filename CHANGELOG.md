@@ -40,3 +40,14 @@ O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.
   - Criação do [ROADMAP.md](file:///home/jc/codigos/rust/player-scout/ROADMAP.md) com acompanhamento detalhado de etapas, status percentual e indicador de etapa atual.
   - Criação deste [CHANGELOG.md](file:///home/jc/codigos/rust/player-scout/CHANGELOG.md) com diretrizes de documentação contínua.
   - Atualização completa do [README.md](file:///home/jc/codigos/rust/player-scout/README.md) detalhando escopo, stack e estrutura do projeto.
+- **Banco de Dados PostgreSQL 18 & MCP (Fase 1):**
+  - Criação do `docker-compose.yml` para orquestração local do **PostgreSQL 18-alpine** e do container **`postgres-mcp`** (Node 22) com healthcheck integrado.
+  - Configuração do volume persistente no ponto de montagem oficial `/var/lib/postgresql` conforme a arquitetura de clusters do PostgreSQL 18+.
+  - Migração inicial [`migrations/001_initial_schema.sql`](file:///home/jc/codigos/rust/player-scout/migrations/001_initial_schema.sql):
+    - Enum com os 21 golpes oficiais do Padel (`shot_type_enum`).
+    - Schemas e tabelas relacionais: `coaches`, `players`, `tournaments`, `matches` e `shot_events`.
+    - Constraints estritas de integridade: `chk_winner_must_be_hit` (Winner exige 'hit'), `chk_unforced_error_must_be_miss` (Erro Não Forçado exige 'miss') e sets de 1 a 5.
+    - Decisão tática padrão configurada como `good` em nível de banco.
+    - Índices compostos de alta performance para o motor analítico e dashboards recursivos.
+  - Segurança de credenciais: remoção de fallbacks hardcoded no `docker-compose.yml` com uso da sintaxe de validação `${VAR:?msg}` e garantia de exclusão do `.env` no `.gitignore`.
+  - Validação prática com 100% de aprovação na criação de tabelas, enums, execução de constraints e funcionamento do MCP.
