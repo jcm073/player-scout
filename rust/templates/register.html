@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Player Scout — Cadastro Completo (Player &amp; Coach)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen py-8 px-4 font-sans antialiased">
+  <div class="max-w-3xl mx-auto bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
+    <!-- Cabeçalho -->
+    <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-4">
+      <div class="flex items-center gap-3">
+        <div class="w-11 h-11 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 font-black text-lg">
+          PS
+        </div>
+        <div>
+          <h1 class="text-xl font-extrabold text-white">Cadastro Completo · Player &amp; Coach</h1>
+          <p class="text-xs text-slate-400">Chaves de Identificação: CPF e E-mail · Hash Criptográfico Argon2i</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <a href="/web/login" class="min-h-[44px] px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-bold text-slate-200 flex items-center">
+          🔐 Já tenho conta (Login)
+        </a>
+        <a href="/" class="min-h-[44px] px-3.5 py-2 rounded-xl bg-slate-800/60 hover:bg-slate-800 border border-slate-800 text-xs font-semibold text-slate-400 flex items-center">
+          Dashboard
+        </a>
+      </div>
+    </div>
+
+    <!-- Formulário de Cadastro Completo com Validações Front-End + HTMX -->
+    <form
+      id="register-form"
+      hx-post="/web/partials/auth/register"
+      hx-target="#register-feedback"
+      hx-swap="innerHTML"
+      onsubmit="return validateRegistrationForm(event)"
+      class="space-y-6"
+    >
+      <!-- 1. Dados Pessoais e Chaves Únicas (CPF / Email) -->
+      <div class="space-y-3">
+        <h2 class="text-xs font-extrabold uppercase tracking-wider text-emerald-400">1. Identificação Pessoal &amp; Contato</h2>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div>
+            <label class="block text-xs font-bold text-slate-300 mb-1" for="reg-first-name">Nome *</label>
+            <input
+              id="reg-first-name"
+              type="text"
+              name="first_name"
+              required
+              minlength="2"
+              maxlength="100"
+              placeholder="Lucas"
+              class="w-full min-h-[48px] px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-sm text-white focus:border-emerald-400 focus:outline-none"
+            />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-300 mb-1" for="reg-last-name">Sobrenome *</label>
+            <input
+              id="reg-last-name"
+              type="text"
+              name="last_name"
+              required
+              minlength="2"
+              maxlength="150"
+              placeholder="Campagnolo"
+              class="w-full min-h-[48px] px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-sm text-white focus:border-emerald-400 focus:outline-none"
+            />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-300 mb-1" for="reg-age">Idade (5 a 120) *</label>
+            <input
+              id="reg-age"
+              type="number"
+              name="age"
+              min="5"
+              max="120"
+              required
+              placeholder="28"
+              class="w-full min-h-[48px] px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-sm text-white focus:border-emerald-400 focus:outline-none"
+            />
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div>
+            <div class="flex items-center justify-between mb-1">
+              <label class="text-xs font-bold text-slate-300" for="reg-cpf">CPF (Chave Única) *</label>
+              <span id="cpf-status" class="text-[11px] font-semibold text-slate-400">11 dígitos</span>
+            </div>
+            <input
+              id="reg-cpf"
+              type="text"
+              name="cpf"
+              required
+              maxlength="14"
+              inputmode="numeric"
+              placeholder="000.000.000-00"
+              oninput="onCpfInput(this)"
+              class="w-full min-h-[48px] px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-sm text-white focus:border-emerald-400 focus:outline-none"
+            />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-300 mb-1" for="reg-email">E-mail (Chave de Login) *</label>
+            <input
+              id="reg-email"
+              type="email"
+              name="email"
+              required
+              placeholder="lucas@playerscout.com.br"
+              class="w-full min-h-[48px] px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-sm text-white focus:border-emerald-400 focus:outline-none"
+            />
+          </div>
+          <div>
+            <div class="flex items-center justify-between mb-1">
+              <label class="text-xs font-bold text-slate-300" for="reg-whatsapp">Telefone WhatsApp *</label>
+              <span id="whatsapp-status" class="text-[11px] text-slate-400">DDD + Número</span>
+            </div>
+            <input
+              id="reg-whatsapp"
+              type="tel"
+              name="whatsapp_phone"
+              required
+              maxlength="16"
+              inputmode="tel"
+              placeholder="(51) 99999-8888"
+              oninput="onWhatsappInput(this)"
+              class="w-full min-h-[48px] px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-sm text-white focus:border-emerald-400 focus:outline-none"
+            />
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. Endereço Completo -->
+      <div class="space-y-3">
+        <h2 class="text-xs font-extrabold uppercase tracking-wider text-emerald-400">2. Endereço Completo</h2>
+        <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
+          <div>
+            <div class="flex items-center justify-between mb-1">
+              <label class="text-xs font-bold text-slate-300" for="reg-cep">CEP *</label>
+              <span id="cep-status" class="text-[11px] text-slate-400">8 dígitos</span>
+            </div>
+            <input
+              id="reg-cep"
+              type="text"
+              name="cep"
+              required
+              maxlength="9"
+              inputmode="numeric"
+              placeholder="90000-000"
+              oninput="onCepInput(this)"
+              class="w-full min-h-[48px] px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-sm text-white focus:border-emerald-400 focus:outline-none"
+            />
+          </div>
+          <div class="sm:col-span-2">
+            <label class="block text-xs font-bold text-slate-300 mb-1" for="reg-street">Rua / Avenida *</label>
+            <input
+              id="reg-street"
+              type="text"
+              name="street"
+              required
+              placeholder="Av. Borges de Medeiros"
+              class="w-full min-h-[48px] px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-sm text-white focus:border-emerald-400 focus:outline-none"
+            />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-300 mb-1" for="reg-number">Número *</label>
+            <input
+              id="reg-number"
+              type="text"
+              name="street_number"
+              required
+              maxlength="30"
+              placeholder="1500"
+              class="w-full min-h-[48px] px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-sm text-white focus:border-emerald-400 focus:outline-none"
+            />
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
+          <div>
+            <div class="flex items-center justify-between mb-1">
+              <label class="text-xs font-bold text-slate-300" for="reg-complement">Complemento</label>
+              <span id="complement-counter" class="text-[11px] font-semibold text-slate-400">0/10</span>
+            </div>
+            <input
+              id="reg-complement"
+              type="text"
+              name="complement"
+              maxlength="10"
+              pattern="^[A-Za-zÀ-ÿ0-9 ]{0,10}$"
+              placeholder="Apto 302"
+              title="Até 10 caracteres alfanuméricos sem caracteres especiais"
+              oninput="onComplementInput(this)"
+              class="w-full min-h-[48px] px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-sm text-white focus:border-emerald-400 focus:outline-none"
+            />
+            <span id="complement-hint" class="text-[10px] text-slate-400">Máx. 10 chars sem especiais</span>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-300 mb-1" for="reg-neighborhood">Bairro *</label>
+            <input
+              id="reg-neighborhood"
+              type="text"
+              name="neighborhood"
+              required
+              placeholder="Moinhos de Vento"
+              class="w-full min-h-[48px] px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-sm text-white focus:border-emerald-400 focus:outline-none"
+            />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-300 mb-1" for="reg-city">Cidade *</label>
+            <input
+              id="reg-city"
+              type="text"
+              name="city"
+              required
+              placeholder="Porto Alegre"
+              class="w-full min-h-[48px] px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-sm text-white focus:border-emerald-400 focus:outline-none"
+            />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-300 mb-1" for="reg-state">Estado (UF) *</label>
+            <select
+              id="reg-state"
+              name="state"
+              required
+              class="w-full min-h-[48px] px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-sm text-white focus:border-emerald-400 focus:outline-none"
+            >
+              <option value="RS" selected>RS - Rio Grande do Sul</option>
+              <option value="SC">SC - Santa Catarina</option>
+              <option value="PR">PR - Paraná</option>
+              <option value="SP">SP - São Paulo</option>
+              <option value="RJ">RJ - Rio de Janeiro</option>
+              <option value="MG">MG - Minas Gerais</option>
+              <option value="DF">DF - Distrito Federal</option>
+              <option value="BA">BA - Bahia</option>
+              <option value="PE">PE - Pernambuco</option>
+              <option value="CE">CE - Ceará</option>
+              <option value="GO">GO - Goiás</option>
+              <option value="ES">ES - Espírito Santo</option>
+              <option value="MT">MT - Mato Grosso</option>
+              <option value="MS">MS - Mato Grosso do Sul</option>
+              <option value="PA">PA - Pará</option>
+              <option value="AM">AM - Amazonas</option>
+              <option value="MA">MA - Maranhão</option>
+              <option value="PB">PB - Paraíba</option>
+              <option value="RN">RN - Rio Grande do Norte</option>
+              <option value="AL">AL - Alagoas</option>
+              <option value="SE">SE - Sergipe</option>
+              <option value="PI">PI - Piauí</option>
+              <option value="RO">RO - Rondônia</option>
+              <option value="TO">TO - Tocantins</option>
+              <option value="AC">AC - Acre</option>
+              <option value="AP">AP - Amapá</option>
+              <option value="RR">RR - Roraima</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. Perfil (Player / Coach) e Posição na Quadra de Padel -->
+      <div class="space-y-3">
+        <h2 class="text-xs font-extrabold uppercase tracking-wider text-emerald-400">3. Perfil no Sistema &amp; Posição em Quadra</h2>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div>
+            <label class="block text-xs font-bold text-slate-300 mb-1" for="reg-role">Perfil de Acesso *</label>
+            <select id="reg-role" name="role" class="w-full min-h-[48px] px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-sm text-white">
+              <option value="player">Player (Atleta — Leitura Analítica)</option>
+              <option value="coach">Coach (Treinador — Registro em Quadra)</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-300 mb-1" for="reg-side">Posição em Quadra *</label>
+            <select id="reg-side" name="preferred_side" class="w-full min-h-[48px] px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-sm text-white">
+              <option value="left">Esquerda / Revés</option>
+              <option value="right">Direita / Drive</option>
+              <option value="both">Ambos os Lados</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-300 mb-1" for="reg-hand">Mão Dominante</label>
+            <select id="reg-hand" name="dominant_hand" class="w-full min-h-[48px] px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-sm text-white">
+              <option value="right_handed">Destro</option>
+              <option value="left_handed">Canhoto</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- 4. Senha Forte com Hash Argon2i e Checklist em Tempo Real -->
+      <div class="space-y-3">
+        <h2 class="text-xs font-extrabold uppercase tracking-wider text-emerald-400">4. Segurança &amp; Senha (Argon2i)</h2>
+        <div>
+          <label class="block text-xs font-bold text-slate-300 mb-1" for="reg-password">Senha *</label>
+          <input
+            id="reg-password"
+            type="password"
+            name="password"
+            required
+            minlength="12"
+            placeholder="Mínimo de 12 caracteres (1 maiúscula, 1 minúscula, 1 número e 1 especial)"
+            oninput="onPasswordInput(this)"
+            class="w-full min-h-[48px] px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-sm text-white focus:border-emerald-400 focus:outline-none"
+          />
+
+          <!-- Indicadores Visuais da Política de Senha no Front-End -->
+          <div class="grid grid-cols-2 sm:grid-cols-5 gap-2 mt-2.5 text-[11px] font-semibold">
+            <div id="pw-rule-len" class="px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-slate-400">
+              ○ 12+ caracteres
+            </div>
+            <div id="pw-rule-upper" class="px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-slate-400">
+              ○ 1 Maiúscula (A-Z)
+            </div>
+            <div id="pw-rule-lower" class="px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-slate-400">
+              ○ 1 Minúscula (a-z)
+            </div>
+            <div id="pw-rule-digit" class="px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-slate-400">
+              ○ 1 Número (0-9)
+            </div>
+            <div id="pw-rule-special" class="px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-slate-400">
+              ○ 1 Especial (!@#$)
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Alerta de Validação Front-End -->
+      <div id="client-validation-error" class="hidden p-3.5 rounded-xl bg-rose-950/80 border border-rose-700 text-rose-200 text-xs font-semibold"></div>
+
+      <button
+        id="register-submit-btn"
+        type="submit"
+        class="w-full min-h-[54px] rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-extrabold text-sm tracking-wide transition"
+      >
+        Concluir Cadastro
+      </button>
+    </form>
+
+    <!-- Área de Resposta HTMX do Servidor -->
+    <div id="register-feedback"></div>
+  </div>
+
+  <script>
+    // Validação Matemática Oficial de CPF (Módulo 11) no Front-End
+    function isValidCpfModulo11(raw) {
+      const digits = raw.replace(/\D/g, '');
+      if (digits.length !== 11) return false;
+      if (/^(\d)\1{10}$/.test(digits)) return false;
+
+      let sum1 = 0;
+      for (let i = 0; i < 9; i++) {
+        sum1 += parseInt(digits.charAt(i), 10) * (10 - i);
+      }
+      let dv1 = (sum1 * 10) % 11;
+      if (dv1 === 10) dv1 = 0;
+      if (dv1 !== parseInt(digits.charAt(9), 10)) return false;
+
+      let sum2 = 0;
+      for (let i = 0; i < 10; i++) {
+        sum2 += parseInt(digits.charAt(i), 10) * (11 - i);
+      }
+      let dv2 = (sum2 * 10) % 11;
+      if (dv2 === 10) dv2 = 0;
+      return dv2 === parseInt(digits.charAt(10), 10);
+    }
+
+    function onCpfInput(input) {
+      const digits = input.value.replace(/\D/g, '').slice(0, 11);
+      let formatted = digits;
+      if (digits.length > 9) {
+        formatted = digits.slice(0, 3) + '.' + digits.slice(3, 6) + '.' + digits.slice(6, 9) + '-' + digits.slice(9, 11);
+      } else if (digits.length > 6) {
+        formatted = digits.slice(0, 3) + '.' + digits.slice(3, 6) + '.' + digits.slice(6);
+      } else if (digits.length > 3) {
+        formatted = digits.slice(0, 3) + '.' + digits.slice(3);
+      }
+      input.value = formatted;
+
+      const statusEl = document.getElementById('cpf-status');
+      if (digits.length === 0) {
+        statusEl.textContent = '11 dígitos';
+        statusEl.className = 'text-[11px] font-semibold text-slate-400';
+        input.setCustomValidity('');
+      } else if (isValidCpfModulo11(digits)) {
+        statusEl.textContent = '✓ CPF válido';
+        statusEl.className = 'text-[11px] font-bold text-emerald-400';
+        input.setCustomValidity('');
+      } else {
+        statusEl.textContent = '✗ CPF inválido';
+        statusEl.className = 'text-[11px] font-bold text-rose-400';
+        input.setCustomValidity('Informe um CPF válido (11 dígitos com verificadores Módulo 11 corretos).');
+      }
+    }
+
+    function onCepInput(input) {
+      const digits = input.value.replace(/\D/g, '').slice(0, 8);
+      input.value = digits.length > 5 ? digits.slice(0, 5) + '-' + digits.slice(5) : digits;
+      const statusEl = document.getElementById('cep-status');
+      if (digits.length === 8) {
+        statusEl.textContent = '✓ CEP válido';
+        statusEl.className = 'text-[11px] font-bold text-emerald-400';
+        input.setCustomValidity('');
+      } else {
+        statusEl.textContent = digits.length + '/8 dígitos';
+        statusEl.className = 'text-[11px] text-amber-400';
+        input.setCustomValidity('O CEP deve conter exatamente 8 dígitos numéricos.');
+      }
+    }
+
+    function onWhatsappInput(input) {
+      const digits = input.value.replace(/\D/g, '').slice(0, 13);
+      const statusEl = document.getElementById('whatsapp-status');
+      if (digits.length >= 10 && digits.length <= 13) {
+        statusEl.textContent = '✓ WhatsApp válido';
+        statusEl.className = 'text-[11px] font-bold text-emerald-400';
+        input.setCustomValidity('');
+      } else {
+        statusEl.textContent = '10 a 13 dígitos';
+        statusEl.className = 'text-[11px] text-rose-400';
+        input.setCustomValidity('Informe um telefone de WhatsApp com DDD (10 a 13 dígitos).');
+      }
+    }
+
+    // Validação em tempo real do Complemento (máximo 10 caracteres, sem símbolos especiais)
+    function onComplementInput(input) {
+      const val = input.value;
+      const counter = document.getElementById('complement-counter');
+      const hint = document.getElementById('complement-hint');
+      counter.textContent = val.length + '/10';
+
+      const validRegex = /^[A-Za-zÀ-ÿ0-9 ]{0,10}$/;
+      if (!validRegex.test(val)) {
+        hint.textContent = '✗ Caracteres especiais não são permitidos';
+        hint.className = 'text-[10px] font-bold text-rose-400';
+        input.setCustomValidity('O complemento permite até 10 caracteres apenas com letras, números e espaços.');
+      } else {
+        hint.textContent = 'Máx. 10 chars sem especiais';
+        hint.className = 'text-[10px] text-slate-400';
+        input.setCustomValidity('');
+      }
+    }
+
+    function setRuleBadge(id, ok, label) {
+      const el = document.getElementById(id);
+      if (ok) {
+        el.textContent = '✓ ' + label;
+        el.className = 'px-2.5 py-1.5 rounded-lg bg-emerald-950/70 border border-emerald-600/70 text-emerald-300';
+      } else {
+        el.textContent = '○ ' + label;
+        el.className = 'px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-slate-400';
+      }
+    }
+
+    // Validação em tempo real dos 5 requisitos da senha Argon2i
+    function onPasswordInput(input) {
+      const pw = input.value;
+      const hasLen = pw.length >= 12;
+      const hasUpper = /[A-ZÀ-Ý]/.test(pw);
+      const hasLower = /[a-zà-ÿ]/.test(pw);
+      const hasDigit = /[0-9]/.test(pw);
+      const hasSpecial = /[^A-Za-zÀ-ÿ0-9\s]/.test(pw);
+
+      setRuleBadge('pw-rule-len', hasLen, '12+ caracteres');
+      setRuleBadge('pw-rule-upper', hasUpper, '1 Maiúscula (A-Z)');
+      setRuleBadge('pw-rule-lower', hasLower, '1 Minúscula (a-z)');
+      setRuleBadge('pw-rule-digit', hasDigit, '1 Número (0-9)');
+      setRuleBadge('pw-rule-special', hasSpecial, '1 Especial (!@#$)');
+
+      if (hasLen && hasUpper && hasLower && hasDigit && hasSpecial) {
+        input.setCustomValidity('');
+      } else {
+        input.setCustomValidity('A senha deve ter no mínimo 12 caracteres, 1 maiúscula, 1 minúscula, 1 número e 1 caractere especial.');
+      }
+    }
+
+    function validateRegistrationForm(event) {
+      const errBox = document.getElementById('client-validation-error');
+      const cpfInput = document.getElementById('reg-cpf');
+      const compInput = document.getElementById('reg-complement');
+      const pwInput = document.getElementById('reg-password');
+
+      onCpfInput(cpfInput);
+      onComplementInput(compInput);
+      onPasswordInput(pwInput);
+
+      const form = document.getElementById('register-form');
+      if (!form.checkValidity()) {
+        event.preventDefault();
+        errBox.textContent = '⚠️ Verifique os campos destacados antes de concluir o cadastro.';
+        errBox.classList.remove('hidden');
+        form.reportValidity();
+        return false;
+      }
+
+      errBox.classList.add('hidden');
+      return true;
+    }
+  </script>
+</body>
+</html>

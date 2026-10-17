@@ -1,0 +1,203 @@
+@baseUrl = http://localhost:3000
+
+### 1. Cadastro Completo de Atleta (Player) — Cria automaticamente o perfil na tabela players, salva senha em Argon2i e emite Sessão Única (12h)
+# @name registerPlayer
+POST {{baseUrl}}/api/v1/auth/register
+Content-Type: application/json
+
+{
+  "first_name": "Arturo",
+  "last_name": "Coello",
+  "age": 22,
+  "cpf": "529.982.247-25",
+  "email": "arturo.{{$guid}}@playerscout.test",
+  "whatsapp_phone": "(51) 99888-7766",
+  "cep": "90570-020",
+  "street": "Rua Padre Chagas",
+  "street_number": "320",
+  "complement": "Apto 402",
+  "neighborhood": "Moinhos de Vento",
+  "city": "Porto Alegre",
+  "state": "RS",
+  "role": "player",
+  "preferred_side": "right",
+  "dominant_hand": "left_handed",
+  "password": "PadelKing2026!@"
+}
+
+### 2. Cadastro Completo de Treinador (Coach) — Posição Esquerda (Revés) e sem complemento
+# @name registerCoach
+POST {{baseUrl}}/api/v1/auth/register
+Content-Type: application/json
+
+{
+  "first_name": "Gustavo",
+  "last_name": "Pratto",
+  "age": 46,
+  "cpf": "11144477735",
+  "email": "pratto.{{$guid}}@playerscout.test",
+  "whatsapp_phone": "(11) 97777-6655",
+  "cep": "01310-100",
+  "street": "Av. Paulista",
+  "street_number": "1500",
+  "complement": "",
+  "neighborhood": "Bela Vista",
+  "city": "São Paulo",
+  "state": "SP",
+  "role": "coach",
+  "preferred_side": "left",
+  "dominant_hand": "right_handed",
+  "password": "CoachMaster2026$%"
+}
+
+### 3. Login Exclusivo por E-mail (Verificação de Hash Argon2i + Emissão de Sessão Única de 12h)
+# @name loginPlayer
+POST {{baseUrl}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{registerPlayer.response.body.user.email}}",
+  "password": "PadelKing2026!@"
+}
+
+### 3.1. Inspeção da Sessão Ativa (12h) do Usuário Autenticado
+GET {{baseUrl}}/api/v1/auth/session
+Authorization: Bearer {{loginPlayer.response.body.session_token}}
+Accept: application/json
+
+### 4. Busca de Usuário pela Chave Única CPF (Restrito a Coach/Admin — LGPD)
+GET {{baseUrl}}/api/v1/auth/lookup?cpf=529.982.247-25
+Authorization: Bearer {{registerCoach.response.body.session_token}}
+Accept: application/json
+
+### 5. Busca de Usuário pela Chave Única E-mail (Restrito a Coach/Admin — LGPD)
+GET {{baseUrl}}/api/v1/auth/lookup?email={{registerPlayer.response.body.user.email}}
+Authorization: Bearer {{registerCoach.response.body.session_token}}
+Accept: application/json
+
+### 6. OAuth2: Obter URL de Autorização do Google (Gmail)
+GET {{baseUrl}}/api/v1/auth/oauth/google/authorize
+Accept: application/json
+
+### 7. OAuth2: Obter URL de Autorização do Microsoft Office
+GET {{baseUrl}}/api/v1/auth/oauth/microsoft/authorize
+Accept: application/json
+
+### 8. OAuth2: Obter URL de Autorização do Instagram
+GET {{baseUrl}}/api/v1/auth/oauth/instagram/authorize
+Accept: application/json
+
+### 9. OAuth2: Callback / Vínculo de Conta Social ao Usuário Autenticado
+POST {{baseUrl}}/api/v1/auth/oauth/google/callback
+Authorization: Bearer {{loginPlayer.response.body.session_token}}
+Content-Type: application/json
+
+{
+  "user_id": "{{registerPlayer.response.body.user.id}}",
+  "provider_user_id": "google-oauth2-{{$guid}}",
+  "provider_email": "{{registerPlayer.response.body.user.email}}"
+}
+
+### 10. Telas Web SSR de Login e Cadastro Completo
+GET {{baseUrl}}/web/login
+Accept: text/html
+
+###
+GET {{baseUrl}}/web/register
+Accept: text/html
+
+### 11. Validação Negativa (422): Senha com menos de 12 caracteres ou sem especial
+POST {{baseUrl}}/api/v1/auth/register
+Content-Type: application/json
+
+{
+  "first_name": "Teste",
+  "last_name": "SenhaFraca",
+  "age": 25,
+  "cpf": "39053344705",
+  "email": "fraca.{{$guid}}@playerscout.test",
+  "whatsapp_phone": "(51) 99888-7766",
+  "cep": "90570-020",
+  "street": "Rua Teste",
+  "street_number": "10",
+  "complement": "Apto 10",
+  "neighborhood": "Centro",
+  "city": "Porto Alegre",
+  "state": "RS",
+  "role": "player",
+  "preferred_side": "left",
+  "dominant_hand": "right_handed",
+  "password": "Curta1!"
+}
+
+### 12. Validação Negativa (422): Complemento com caractere especial ou > 10 caracteres
+POST {{baseUrl}}/api/v1/auth/register
+Content-Type: application/json
+
+{
+  "first_name": "Teste",
+  "last_name": "ComplementoInvalido",
+  "age": 25,
+  "cpf": "39053344705",
+  "email": "comp.{{$guid}}@playerscout.test",
+  "whatsapp_phone": "(51) 99888-7766",
+  "cep": "90570-020",
+  "street": "Rua Teste",
+  "street_number": "10",
+  "complement": "Apto #302",
+  "neighborhood": "Centro",
+  "city": "Porto Alegre",
+  "state": "RS",
+  "role": "player",
+  "preferred_side": "left",
+  "dominant_hand": "right_handed",
+  "password": "PadelKing2026!@"
+}
+
+### 13. Validação Negativa (422): Bloqueio de Escalação de Privilégio (role: "admin" no auto-cadastro público)
+POST {{baseUrl}}/api/v1/auth/register
+Content-Type: application/json
+
+{
+  "first_name": "Invasor",
+  "last_name": "Admin",
+  "age": 30,
+  "cpf": "39053344705",
+  "email": "admin.exploit.{{$guid}}@playerscout.test",
+  "whatsapp_phone": "(51) 99888-7766",
+  "cep": "90570-020",
+  "street": "Rua Teste",
+  "street_number": "10",
+  "complement": "Sala 1",
+  "neighborhood": "Centro",
+  "city": "Porto Alegre",
+  "state": "RS",
+  "role": "admin",
+  "preferred_side": "left",
+  "dominant_hand": "right_handed",
+  "password": "PadelKing2026!@"
+}
+
+### 14. Validação Negativa (401 / 429): Login com senha incorreta (5 falhas consecutivas bloqueiam por 15 min)
+POST {{baseUrl}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{registerPlayer.response.body.user.email}}",
+  "password": "SenhaIncorreta2026!@"
+}
+
+### 15. Troca de Senha Autenticada com Rotação Imediata da Sessão Única (12h)
+# @name rotatePassword
+POST {{baseUrl}}/api/v1/auth/password
+Authorization: Bearer {{loginPlayer.response.body.session_token}}
+Content-Type: application/json
+
+{
+  "current_password": "PadelKing2026!@",
+  "new_password": "PadelRotated2026#$"
+}
+
+### 16. Logoff — Exclui fisicamente (`DELETE`) o token da sessão do banco de dados
+POST {{baseUrl}}/api/v1/auth/logout
+Authorization: Bearer {{rotatePassword.response.body.session_token}}

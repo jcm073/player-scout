@@ -33,6 +33,10 @@ thiserror = "2.0"
 uuid = { version = "1.13", features = ["v4", "v7", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
 
+# Segurança e Hashing de Senhas (Argon2i - RustCrypto)
+argon2 = { version = "0.5.3", features = ["std"] }
+rand_core = { version = "0.6", features = ["getrandom"] }
+
 # Logs, Rastreamento & Variáveis de Ambiente
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }

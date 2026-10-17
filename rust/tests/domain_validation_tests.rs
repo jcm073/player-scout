@@ -428,3 +428,177 @@ fn test_analytics_comparison_deltas_set1_vs_set2() {
     assert_eq!(comparison.deltas.winners_delta, 1);
     assert_eq!(comparison.deltas.unforced_errors_delta, -1);
 }
+
+#[test]
+fn test_argon2i_password_hashing_and_policy_validation() {
+    use player_scout::domain::{hash_password_argon2i, validate_password, verify_password_argon2i};
+
+    // Menos de 12 caracteres -> inválido
+    assert!(validate_password("Padel2026!").is_err());
+    // Sem letra maiúscula -> inválido
+    assert!(validate_password("padelpro2026!@").is_err());
+    // Sem letra minúscula -> inválido
+    assert!(validate_password("PADELPRO2026!@").is_err());
+    // Sem número -> inválido
+    assert!(validate_password("PadelProMaster!@").is_err());
+    // Sem caractere especial -> inválido
+    assert!(validate_password("PadelPro2026Ab").is_err());
+
+    // Senha válida: 14 caracteres, maiúscula, minúscula, número e especial
+    let valid_pass = "PadelPro2026!@";
+    assert!(validate_password(valid_pass).is_ok());
+
+    let hash = hash_password_argon2i(valid_pass).expect("Deve gerar hash Argon2i");
+    assert!(
+        hash.starts_with("$argon2i$v=19$"),
+        "O hash deve usar explicitamente o algoritmo Argon2i: {hash}"
+    );
+    assert!(verify_password_argon2i(valid_pass, &hash));
+    assert!(!verify_password_argon2i("SenhaErrada2026!@", &hash));
+}
+
+#[test]
+fn test_cpf_modulo_11_and_complement_validation() {
+    use player_scout::domain::{
+        validate_and_normalize_cep, validate_and_normalize_cpf, validate_complement,
+    };
+
+    // CPF válido com máscara -> normaliza para 11 dígitos
+    let cpf = validate_and_normalize_cpf("529.982.247-25").expect("CPF válido");
+    assert_eq!(cpf, "52998224725");
+
+    // CPF com dígitos repetidos -> inválido
+    assert!(validate_and_normalize_cpf("111.111.111-11").is_err());
+    // CPF com dígito verificador incorreto -> inválido
+    assert!(validate_and_normalize_cpf("529.982.247-20").is_err());
+
+    // CEP válido com máscara -> normaliza para 8 dígitos
+    let cep = validate_and_normalize_cep("90010-150").expect("CEP válido");
+    assert_eq!(cep, "90010150");
+    assert!(validate_and_normalize_cep("9001-150").is_err());
+
+    // Complemento: vazio permitido (casas sem bloco/apto)
+    assert_eq!(validate_complement("   ").unwrap(), "");
+    // Complemento válido com até 10 caracteres alfanuméricos sem especiais
+    assert_eq!(validate_complement("Apto 302B").unwrap(), "Apto 302B");
+    // Complemento > 10 caracteres -> inválido
+    assert!(validate_complement("Apartamento 302").is_err());
+    // Complemento com caractere especial -> inválido
+    assert!(validate_complement("Apto #302").is_err());
+    assert!(validate_complement("Bloco-A").is_err());
+}
+
+#[test]
+fn test_session_token_generation_and_argon2i_verification() {
+    use player_scout::domain::{
+        ACCOUNT_LOCKOUT_SECONDS, MAX_FAILED_LOGIN_ATTEMPTS, SESSION_TTL_HOURS, SESSION_TTL_SECONDS,
+        extract_bearer_token, extract_session_token_from_cookie,
+        generate_and_hash_session_token_argon2i, parse_session_token_id,
+        verify_session_token_argon2i,
+    };
+
+    // Verifica constantes de segurança (12 horas = 43.200s e 5 tentativas = 15 min)
+    assert_eq!(SESSION_TTL_HOURS, 12);
+    assert_eq!(SESSION_TTL_SECONDS, 43_200);
+    assert_eq!(MAX_FAILED_LOGIN_ATTEMPTS, 5);
+    assert_eq!(ACCOUNT_LOCKOUT_SECONDS, 900);
+
+    let session_id = Uuid::now_v7();
+    let (raw_token, token_hash) =
+        generate_and_hash_session_token_argon2i(session_id).expect("deve gerar token e hash");
+
+    assert!(raw_token.starts_with("ps_sess_"));
+    assert!(
+        token_hash.starts_with("$argon2i$v=19$"),
+        "O hash do token de sessão deve utilizar a mesma biblioteca Argon2i: {token_hash}"
+    );
+
+    let parsed_id = parse_session_token_id(&raw_token).expect("deve extrair session_id");
+    assert_eq!(parsed_id, session_id);
+
+    assert!(verify_session_token_argon2i(&raw_token, &token_hash));
+    assert!(!verify_session_token_argon2i(
+        "ps_sess_00000000000000000000000000000000_segredoinvalido123456",
+        &token_hash
+    ));
+
+    let cookie_header = format!("theme=dark; ps_session={raw_token}; SameSite=Lax");
+    assert_eq!(
+        extract_session_token_from_cookie(&cookie_header).as_deref(),
+        Some(raw_token.as_str())
+    );
+    let bearer_header = format!("Bearer {raw_token}");
+    assert_eq!(
+        extract_bearer_token(&bearer_header).as_deref(),
+        Some(raw_token.as_str())
+    );
+}
+
+#[test]
+fn test_registration_blocks_admin_privilege_escalation_and_bola_actor_resolution() {
+    use chrono::Utc;
+    use player_scout::domain::{
+        AuthenticatedUser, DominantHand, PreferredSide, RegistrationInput, User, UserSession,
+        verify_dummy_password_argon2i,
+    };
+
+    // 1. Auto-cadastro com role Admin deve ser bloqueado na camada de domínio
+    let admin_reg = RegistrationInput {
+        first_name: "Invasor".to_string(),
+        last_name: "Malicioso".to_string(),
+        age: 30,
+        cpf: "529.982.247-25".to_string(),
+        email: "invasor@padel.com".to_string(),
+        whatsapp_phone: "11988887777".to_string(),
+        cep: "01310-100".to_string(),
+        street: "Av Paulista".to_string(),
+        street_number: "1000".to_string(),
+        complement: "Sala 1".to_string(),
+        neighborhood: "Bela Vista".to_string(),
+        city: "São Paulo".to_string(),
+        state: "SP".to_string(),
+        role: UserRole::Admin,
+        preferred_side: PreferredSide::Left,
+        dominant_hand: DominantHand::RightHanded,
+        password: "Padel#2026StrongPass".to_string(),
+    };
+
+    let err = admin_reg
+        .validate_and_hash()
+        .expect_err("não deve permitir auto-cadastro como Admin");
+    assert_eq!(err, DomainError::ForbiddenRoleInRegistration);
+    assert_eq!(err.code(), "FORBIDDEN_ROLE_IN_REGISTRATION");
+
+    // 2. Proteção Anti-Spoofing (BOLA): Player/Coach não podem falsificar actor_id de terceiros
+    let now = Utc::now();
+    let player_user = User::new_player("Atleta A", "a@padel.com", "hash");
+    let other_user_id = Uuid::now_v7();
+    let session = UserSession {
+        id: Uuid::now_v7(),
+        user_id: player_user.id,
+        created_at_epoch: now.timestamp(),
+        expires_at_epoch: now.timestamp() + 43_200,
+        created_at: now,
+        expires_at: now,
+        ttl_seconds: 43_200,
+    };
+    let auth_player = AuthenticatedUser {
+        user: player_user.clone(),
+        session,
+    };
+
+    // Sem actor_id explícito -> resolve para o próprio usuário autenticado
+    assert_eq!(auth_player.resolve_actor_id(None).unwrap(), player_user.id);
+    // Com o próprio actor_id -> permitido
+    assert_eq!(
+        auth_player.resolve_actor_id(Some(player_user.id)).unwrap(),
+        player_user.id
+    );
+    // Com actor_id de outro usuário -> bloqueado (403 Forbidden)
+    assert!(auth_player.resolve_actor_id(Some(other_user_id)).is_err());
+    // require_coach_or_admin -> bloqueado para Player
+    assert!(auth_player.require_coach_or_admin().is_err());
+
+    // 3. Executa dummy Argon2i para garantir que não entra em pânico
+    verify_dummy_password_argon2i("QualquerSenhaTentada123!");
+}

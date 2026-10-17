@@ -2,8 +2,9 @@ use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
 use crate::domain::{
-    CoachPlayer, DecisionQuality, DominantHand, MatchSession, MatchStatus, Player, PreferredSide,
-    ShotEvent, ShotOutcome, ShotType, SpecialTag, User, UserRole,
+    CoachPlayer, DecisionQuality, DominantHand, MatchSession, MatchStatus, OAuthProvider, Player,
+    PreferredSide, ShotEvent, ShotOutcome, ShotType, SpecialTag, User, UserOAuthAccount, UserRole,
+    UserSession,
 };
 
 /// Extrai o timestamp exato embutido em um UUIDv7 ou retorna `Utc::now()` para UUIDv4
@@ -26,9 +27,25 @@ pub struct UserRecord {
     pub id: Uuid,
     pub role: UserRole,
     pub name: String,
+    pub first_name: Option<String>,
+    pub last_name: Option<String>,
+    pub age: Option<u8>,
+    #[unique]
+    pub cpf: Option<String>,
     #[unique]
     pub email: String,
+    pub whatsapp_phone: Option<String>,
+    pub cep: Option<String>,
+    pub street: Option<String>,
+    pub street_number: Option<String>,
+    pub complement: Option<String>,
+    pub neighborhood: Option<String>,
+    pub city: Option<String>,
+    pub state: Option<String>,
+    pub preferred_side: PreferredSide,
     pub password_hash: String,
+    pub failed_login_attempts: u8,
+    pub locked_until_epoch: Option<i64>,
 }
 
 impl From<UserRecord> for User {
@@ -38,10 +55,84 @@ impl From<UserRecord> for User {
             id: rec.id,
             role: rec.role,
             name: rec.name,
+            first_name: rec.first_name,
+            last_name: rec.last_name,
+            age: rec.age,
+            cpf: rec.cpf,
             email: rec.email,
+            whatsapp_phone: rec.whatsapp_phone,
+            cep: rec.cep,
+            street: rec.street,
+            street_number: rec.street_number,
+            complement: rec.complement,
+            neighborhood: rec.neighborhood,
+            city: rec.city,
+            state: rec.state,
+            preferred_side: rec.preferred_side,
             password_hash: rec.password_hash,
             created_at: ts,
             updated_at: ts,
+        }
+    }
+}
+
+/// Modelo Toasty mapeado para a tabela `user_sessions` do PostgreSQL 18:
+/// - `#[unique] user_id` garante sessão única por usuário
+/// - `token_hash` armazena o hash Argon2i do token opaco
+#[derive(Debug, Clone, toasty::Model)]
+#[table = "user_sessions"]
+pub struct UserSessionRecord {
+    #[key]
+    #[auto]
+    pub id: Uuid,
+    #[unique]
+    pub user_id: Uuid,
+    pub token_hash: String,
+    pub created_at_epoch: i64,
+    pub expires_at_epoch: i64,
+}
+
+impl From<UserSessionRecord> for UserSession {
+    fn from(rec: UserSessionRecord) -> Self {
+        let created_at = DateTime::from_timestamp(rec.created_at_epoch, 0).unwrap_or_else(Utc::now);
+        let expires_at = DateTime::from_timestamp(rec.expires_at_epoch, 0).unwrap_or_else(Utc::now);
+        let now_epoch = Utc::now().timestamp();
+        Self {
+            id: rec.id,
+            user_id: rec.user_id,
+            created_at_epoch: rec.created_at_epoch,
+            expires_at_epoch: rec.expires_at_epoch,
+            created_at,
+            expires_at,
+            ttl_seconds: (rec.expires_at_epoch - now_epoch).max(0),
+        }
+    }
+}
+
+/// Modelo Toasty mapeado para a tabela `user_oauth_accounts` do PostgreSQL 18
+#[derive(Debug, Clone, toasty::Model)]
+#[table = "user_oauth_accounts"]
+pub struct UserOAuthRecord {
+    #[key]
+    #[auto]
+    pub id: Uuid,
+    #[index]
+    pub user_id: Uuid,
+    pub provider: OAuthProvider,
+    pub provider_user_id: String,
+    pub provider_email: String,
+}
+
+impl From<UserOAuthRecord> for UserOAuthAccount {
+    fn from(rec: UserOAuthRecord) -> Self {
+        let ts = timestamp_from_uuid(&rec.id);
+        Self {
+            id: rec.id,
+            user_id: rec.user_id,
+            provider: rec.provider,
+            provider_user_id: rec.provider_user_id,
+            provider_email: rec.provider_email,
+            created_at: ts,
         }
     }
 }

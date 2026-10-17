@@ -1,5 +1,5 @@
 use axum::{
-    Json,
+    Extension, Json,
     extract::{Path, Query, State},
     http::StatusCode,
 };
@@ -8,7 +8,7 @@ use uuid::Uuid;
 
 use crate::{
     db::Database,
-    domain::{CoachPlayer, DominantHand, Player, PreferredSide, User},
+    domain::{AuthenticatedUser, CoachPlayer, DominantHand, Player, PreferredSide, User},
     error::Result,
 };
 
@@ -45,11 +45,13 @@ pub struct AssignCoachRequest {
 
 pub async fn create_player(
     State(db): State<Database>,
+    Extension(auth_user): Extension<AuthenticatedUser>,
     Json(payload): Json<CreatePlayerRequest>,
 ) -> Result<(StatusCode, Json<Player>)> {
+    let actor_id = auth_user.resolve_actor_id(Some(payload.actor_id))?;
     let player = db
         .create_player(
-            payload.actor_id,
+            actor_id,
             payload.user_id,
             payload.name,
             payload.dominant_hand,
@@ -63,28 +65,34 @@ pub async fn create_player(
 
 pub async fn list_players(
     State(db): State<Database>,
+    Extension(auth_user): Extension<AuthenticatedUser>,
     Query(query): Query<ActorQuery>,
 ) -> Result<Json<Vec<Player>>> {
-    let players = db.list_players_for_actor(query.actor_id).await?;
+    let actor_id = auth_user.resolve_actor_id(Some(query.actor_id))?;
+    let players = db.list_players_for_actor(actor_id).await?;
     Ok(Json(players))
 }
 
 pub async fn get_player(
     State(db): State<Database>,
+    Extension(auth_user): Extension<AuthenticatedUser>,
     Path(id): Path<Uuid>,
     Query(query): Query<ActorQuery>,
 ) -> Result<Json<Player>> {
-    let player = db.verify_player_read_access(query.actor_id, id).await?;
+    let actor_id = auth_user.resolve_actor_id(Some(query.actor_id))?;
+    let player = db.verify_player_read_access(actor_id, id).await?;
     Ok(Json(player))
 }
 
 pub async fn assign_coach(
     State(db): State<Database>,
+    Extension(auth_user): Extension<AuthenticatedUser>,
     Path(player_id): Path<Uuid>,
     Json(payload): Json<AssignCoachRequest>,
 ) -> Result<(StatusCode, Json<CoachPlayer>)> {
+    let actor_id = auth_user.resolve_actor_id(Some(payload.actor_id))?;
     let link = db
-        .assign_coach_to_player(payload.actor_id, payload.coach_id, player_id)
+        .assign_coach_to_player(actor_id, payload.coach_id, player_id)
         .await?;
 
     Ok((StatusCode::CREATED, Json(link)))
@@ -92,12 +100,12 @@ pub async fn assign_coach(
 
 pub async fn list_player_coaches(
     State(db): State<Database>,
+    Extension(auth_user): Extension<AuthenticatedUser>,
     Path(player_id): Path<Uuid>,
     Query(query): Query<ActorQuery>,
 ) -> Result<Json<Vec<User>>> {
-    let _player = db
-        .verify_player_read_access(query.actor_id, player_id)
-        .await?;
+    let actor_id = auth_user.resolve_actor_id(Some(query.actor_id))?;
+    let _player = db.verify_player_read_access(actor_id, player_id).await?;
     let coaches = db.list_coaches_for_player(player_id).await?;
     Ok(Json(coaches))
 }

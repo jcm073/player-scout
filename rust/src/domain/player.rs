@@ -4,21 +4,33 @@ use uuid::Uuid;
 
 use super::DomainError;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, toasty::Embed)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, toasty::Embed)]
 #[serde(rename_all = "snake_case")]
 #[column(type = enum("dominant_hand_enum"))]
 pub enum DominantHand {
+    #[default]
     RightHanded,
     LeftHanded,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, toasty::Embed)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, toasty::Embed)]
 #[serde(rename_all = "snake_case")]
 #[column(type = enum("preferred_side_enum"))]
 pub enum PreferredSide {
+    #[default]
     Left,
     Right,
     Both,
+}
+
+impl PreferredSide {
+    pub fn label_pt(&self) -> &'static str {
+        match self {
+            PreferredSide::Left => "Esquerda (Revés)",
+            PreferredSide::Right => "Direita (Drive)",
+            PreferredSide::Both => "Ambos os Lados",
+        }
+    }
 }
 
 /// Perfil do Atleta no Player Scout

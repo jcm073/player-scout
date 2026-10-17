@@ -1,20 +1,33 @@
 use askama::Template;
 use axum::{
-    Form,
+    Extension, Form,
     extract::{Query, State},
-    response::Html,
+    http::{HeaderMap, HeaderValue, header},
+    response::{Html, IntoResponse, Redirect, Response},
 };
 use serde::Deserialize;
 use uuid::Uuid;
 
 use crate::{
+    api::auth::{
+        LoginRequest, append_security_headers, build_clear_session_cookie, build_session_cookie,
+        extract_token_from_headers,
+    },
     db::{Database, NewShotInput},
     domain::{
-        AnalyticsComparisonReport, AnalyticsFilter, DecisionQuality, PlayerAnalyticsReport,
-        ShotEvent, ShotOutcome, ShotType, SpecialTag,
+        AnalyticsComparisonReport, AnalyticsFilter, AuthenticatedUser, DecisionQuality,
+        PlayerAnalyticsReport, RegistrationInput, ShotEvent, ShotOutcome, ShotType, SpecialTag,
     },
     error::{AppError, Result},
 };
+
+#[derive(Template)]
+#[template(path = "login.html")]
+pub struct LoginTemplate {}
+
+#[derive(Template)]
+#[template(path = "register.html")]
+pub struct RegisterTemplate {}
 
 #[derive(Template)]
 #[template(path = "partials/analytics_panel.html")]
@@ -79,7 +92,7 @@ pub struct WebCourtQuery {
 
 #[derive(Debug, Deserialize)]
 pub struct WebAnalyticsPartialQuery {
-    pub actor_id: Uuid,
+    pub actor_id: Option<Uuid>,
     pub player_id: Uuid,
     pub match_id: Option<Uuid>,
     pub set_number: Option<u8>,
@@ -87,7 +100,7 @@ pub struct WebAnalyticsPartialQuery {
 
 #[derive(Debug, Deserialize)]
 pub struct WebComparePartialQuery {
-    pub actor_id: Uuid,
+    pub actor_id: Option<Uuid>,
     pub player_id: Uuid,
     pub match_id: Option<Uuid>,
     pub set_a: Option<u8>,
@@ -96,7 +109,7 @@ pub struct WebComparePartialQuery {
 
 #[derive(Debug, Deserialize)]
 pub struct CourtShotForm {
-    pub actor_id: Uuid,
+    pub actor_id: Option<Uuid>,
     pub player_id: Uuid,
     pub match_id: Uuid,
     pub set_number: u8,
@@ -108,16 +121,19 @@ pub struct CourtShotForm {
 
 #[derive(Debug, Deserialize)]
 pub struct CourtUndoForm {
-    pub actor_id: Uuid,
+    pub actor_id: Option<Uuid>,
     pub match_id: Uuid,
 }
 
 /// Renderiza o Dashboard Analítico Web (`GET /` e `GET /web/dashboard`)
 pub async fn dashboard_page(
     State(db): State<Database>,
+    Extension(auth_user): Extension<AuthenticatedUser>,
     Query(query): Query<WebDashboardQuery>,
 ) -> Result<Html<String>> {
-    if let (Some(actor_id), Some(player_id)) = (query.actor_id, query.player_id) {
+    let actor_id = auth_user.resolve_actor_id(query.actor_id)?;
+
+    if let Some(player_id) = query.player_id {
         let player = db.verify_player_read_access(actor_id, player_id).await?;
         let filter = AnalyticsFilter {
             match_id: query.match_id,
@@ -170,7 +186,7 @@ pub async fn dashboard_page(
         return Ok(Html(html));
     }
 
-    // Modo inicial sem parâmetros de consulta (exibição de estrutura vazia)
+    // Modo inicial sem player_id selecionado (exibição de estrutura vazia com o ator autenticado)
     let nil_id = Uuid::nil();
     let empty_report = PlayerAnalyticsReport::from_events(nil_id, AnalyticsFilter::default(), &[]);
     let analytics_html = AnalyticsPanelTemplate {
@@ -179,7 +195,7 @@ pub async fn dashboard_page(
     .render()?;
 
     let html = DashboardTemplate {
-        actor_id: nil_id,
+        actor_id,
         player_id: nil_id,
         match_id: None,
         player_name: "Atleta Demonstração (Informe actor_id e player_id)".to_string(),
@@ -194,11 +210,12 @@ pub async fn dashboard_page(
 /// Renderiza a Tela Touch-First de Quadra do Treinador (`GET /web/court`)
 pub async fn court_page(
     State(db): State<Database>,
+    Extension(auth_user): Extension<AuthenticatedUser>,
     Query(query): Query<WebCourtQuery>,
 ) -> Result<Html<String>> {
-    if let (Some(actor_id), Some(player_id), Some(match_id)) =
-        (query.actor_id, query.player_id, query.match_id)
-    {
+    let actor_id = auth_user.resolve_actor_id(query.actor_id)?;
+
+    if let (Some(player_id), Some(match_id)) = (query.player_id, query.match_id) {
         let player = db.verify_player_read_access(actor_id, player_id).await?;
         let feed_html = build_court_feed_html(&db, actor_id, player_id, match_id, None).await?;
 
@@ -227,7 +244,7 @@ pub async fn court_page(
     .render()?;
 
     let html = CourtTemplate {
-        actor_id: nil_id,
+        actor_id,
         player_id: nil_id,
         match_id: nil_id,
         player_name: "Atleta em Quadra".to_string(),
@@ -244,8 +261,10 @@ pub async fn court_page(
 /// Fragmento HTMX: Painel Analítico Recursivo (`GET /web/partials/analytics`)
 pub async fn analytics_partial(
     State(db): State<Database>,
+    Extension(auth_user): Extension<AuthenticatedUser>,
     Query(query): Query<WebAnalyticsPartialQuery>,
 ) -> Result<Html<String>> {
+    let actor_id = auth_user.resolve_actor_id(query.actor_id)?;
     let filter = AnalyticsFilter {
         match_id: query.match_id,
         set_number: query.set_number,
@@ -253,7 +272,7 @@ pub async fn analytics_partial(
         to_date: None,
     };
     let report = db
-        .compute_player_analytics(query.actor_id, query.player_id, filter)
+        .compute_player_analytics(actor_id, query.player_id, filter)
         .await?;
 
     let html = AnalyticsPanelTemplate { report }.render()?;
@@ -263,8 +282,10 @@ pub async fn analytics_partial(
 /// Fragmento HTMX: Modo Comparativo Lado a Lado (`GET /web/partials/compare`)
 pub async fn compare_partial(
     State(db): State<Database>,
+    Extension(auth_user): Extension<AuthenticatedUser>,
     Query(query): Query<WebComparePartialQuery>,
 ) -> Result<Html<String>> {
+    let actor_id = auth_user.resolve_actor_id(query.actor_id)?;
     let set_a = query.set_a.unwrap_or(1);
     let set_b = query.set_b.unwrap_or(2);
 
@@ -282,7 +303,7 @@ pub async fn compare_partial(
     };
 
     let comparison = db
-        .compare_player_analytics(query.actor_id, query.player_id, scope_a, scope_b)
+        .compare_player_analytics(actor_id, query.player_id, scope_a, scope_b)
         .await?;
 
     let html = ComparePanelTemplate {
@@ -298,8 +319,10 @@ pub async fn compare_partial(
 /// Fragmento HTMX: Registro Touch-First de Golpe em Quadra (`POST /web/partials/court/shot`)
 pub async fn court_record_shot_partial(
     State(db): State<Database>,
+    Extension(auth_user): Extension<AuthenticatedUser>,
     Form(form): Form<CourtShotForm>,
 ) -> Result<Html<String>> {
+    let actor_id = auth_user.resolve_actor_id(form.actor_id)?;
     let parsed_special_tag = match form.special_tag.as_deref().map(str::trim) {
         None | Some("") => None,
         Some("winner") => Some(SpecialTag::Winner),
@@ -322,7 +345,7 @@ pub async fn court_record_shot_partial(
 
     let recorded = db
         .record_shot(
-            form.actor_id,
+            actor_id,
             form.match_id,
             NewShotInput {
                 player_id: form.player_id,
@@ -346,14 +369,8 @@ pub async fn court_record_shot_partial(
         recorded.set_number
     );
 
-    let html = build_court_feed_html(
-        &db,
-        form.actor_id,
-        form.player_id,
-        form.match_id,
-        Some(banner),
-    )
-    .await?;
+    let html =
+        build_court_feed_html(&db, actor_id, form.player_id, form.match_id, Some(banner)).await?;
 
     Ok(Html(html))
 }
@@ -361,23 +378,19 @@ pub async fn court_record_shot_partial(
 /// Fragmento HTMX: Desfazer Última Jogada em Quadra (`POST /web/partials/court/undo`)
 pub async fn court_undo_shot_partial(
     State(db): State<Database>,
+    Extension(auth_user): Extension<AuthenticatedUser>,
     Form(form): Form<CourtUndoForm>,
 ) -> Result<Html<String>> {
-    let undone = db.undo_last_shot(form.actor_id, form.match_id).await?;
+    let actor_id = auth_user.resolve_actor_id(form.actor_id)?;
+    let undone = db.undo_last_shot(actor_id, form.match_id).await?;
     let banner = format!(
         "↩️ Jogada desfeita: {} (Set {})",
         undone.shot_type.label_pt(),
         undone.set_number
     );
 
-    let html = build_court_feed_html(
-        &db,
-        form.actor_id,
-        undone.player_id,
-        form.match_id,
-        Some(banner),
-    )
-    .await?;
+    let html =
+        build_court_feed_html(&db, actor_id, undone.player_id, form.match_id, Some(banner)).await?;
 
     Ok(Html(html))
 }
@@ -409,4 +422,156 @@ async fn build_court_feed_html(
     .render()?;
 
     Ok(html)
+}
+
+/// Renderiza a Tela de Login (`GET /web/login`)
+pub async fn login_page() -> Result<Html<String>> {
+    let html = LoginTemplate {}.render()?;
+    Ok(Html(html))
+}
+
+/// Renderiza a Tela de Cadastro Completo (`GET /web/register`)
+pub async fn register_page() -> Result<Html<String>> {
+    let html = RegisterTemplate {}.render()?;
+    Ok(Html(html))
+}
+
+/// Fragmento HTMX: Processa Login por E-mail (`POST /web/partials/auth/login`)
+/// - Emite o cookie HttpOnly `ps_session` com duração de 12 horas
+/// - Substitui e exclui qualquer sessão anterior do mesmo usuário (sessão única)
+pub async fn web_login_partial(
+    State(db): State<Database>,
+    Form(form): Form<LoginRequest>,
+) -> Result<Response> {
+    match db.authenticate_by_email(&form.email, &form.password).await {
+        Ok((user, player_profile, session_token, session)) => {
+            let dashboard_link = if let Some(player) = &player_profile {
+                format!(
+                    "/web/dashboard?actor_id={}&player_id={}",
+                    user.id, player.id
+                )
+            } else {
+                format!("/web/dashboard?actor_id={}&player_id={}", user.id, user.id)
+            };
+
+            let html = format!(
+                r#"<div class="p-4 rounded-xl bg-emerald-950/80 border border-emerald-700 text-emerald-200 text-xs space-y-2">
+                    <div class="font-extrabold text-sm text-emerald-300">✅ Login autenticado com sucesso!</div>
+                    <div>Bem-vindo(a), <strong>{}</strong> (Perfil: <code>{}</code> · Posição: <code>{}</code>).</div>
+                    <div class="text-[11px] text-emerald-400/90">🔒 Sessão única ativa por <strong>12 horas</strong> (expira em <code>{}</code>).</div>
+                    <div class="pt-1">
+                      <a href="{}" class="inline-block px-3.5 py-2 rounded-lg bg-emerald-600 text-white font-bold">Acessar Dashboard Analítico →</a>
+                    </div>
+                </div>"#,
+                user.name,
+                user.role.as_str(),
+                user.preferred_side.label_pt(),
+                session.expires_at.format("%d/%m/%Y %H:%M UTC"),
+                dashboard_link
+            );
+
+            let mut headers = HeaderMap::new();
+            if let Ok(cookie_val) = HeaderValue::from_str(&build_session_cookie(&session_token)) {
+                headers.insert(header::SET_COOKIE, cookie_val);
+            }
+            append_security_headers(&mut headers);
+
+            Ok((headers, Html(html)).into_response())
+        }
+        Err(err) => {
+            let html = format!(
+                r#"<div class="p-4 rounded-xl bg-rose-950/80 border border-rose-700 text-rose-200 text-xs font-semibold">
+                    ❌ Falha no login: {}
+                </div>"#,
+                err
+            );
+            Ok(Html(html).into_response())
+        }
+    }
+}
+
+/// Fragmento HTMX: Processa Cadastro Completo de Player ou Coach (`POST /web/partials/auth/register`)
+pub async fn web_register_partial(
+    State(db): State<Database>,
+    Form(form): Form<RegistrationInput>,
+) -> Result<Response> {
+    match db.register_user_with_profile(form).await {
+        Ok((user, player_profile)) => {
+            let (session_token, _session) = db.create_or_replace_session(user.id).await?;
+            let profile_note = if let Some(player) = &player_profile {
+                format!(
+                    "Perfil de Atleta vinculado automaticamente (ID: <code>{}</code>, Posição: <strong>{}</strong>).",
+                    player.id,
+                    player.preferred_side.label_pt()
+                )
+            } else {
+                format!(
+                    "Perfil de Treinador ativo (Posição de referência: <strong>{}</strong>).",
+                    user.preferred_side.label_pt()
+                )
+            };
+
+            let html = format!(
+                r#"<div class="p-4 rounded-xl bg-emerald-950/80 border border-emerald-700 text-emerald-200 text-xs space-y-2">
+                    <div class="font-extrabold text-sm text-emerald-300">✅ Cadastro concluído com sucesso!</div>
+                    <div>Usuário: <strong>{}</strong> · CPF: <code>{}</code> · E-mail: <code>{}</code></div>
+                    <div>{}</div>
+                    <div class="pt-1">
+                      <a href="/web/login" class="inline-block px-3.5 py-2 rounded-lg bg-emerald-600 text-white font-bold">Ir para o Login →</a>
+                    </div>
+                </div>"#,
+                user.name,
+                user.cpf.as_deref().unwrap_or(""),
+                user.email,
+                profile_note
+            );
+
+            let mut headers = HeaderMap::new();
+            if let Ok(cookie_val) = HeaderValue::from_str(&build_session_cookie(&session_token)) {
+                headers.insert(header::SET_COOKIE, cookie_val);
+            }
+            append_security_headers(&mut headers);
+
+            Ok((headers, Html(html)).into_response())
+        }
+        Err(err) => {
+            let html = format!(
+                r#"<div class="p-4 rounded-xl bg-rose-950/80 border border-rose-700 text-rose-200 text-xs font-semibold">
+                    ❌ Erro ao realizar cadastro: {}
+                </div>"#,
+                err
+            );
+            Ok(Html(html).into_response())
+        }
+    }
+}
+
+/// Endpoint Web de Logoff (`POST /web/auth/logout`)
+/// - Exclui fisicamente o token da sessão do banco de dados
+/// - Remove o cookie `ps_session` (`Max-Age=0`) e redireciona para `/web/login`
+pub async fn web_logout(State(db): State<Database>, headers: HeaderMap) -> Response {
+    if let Some(token) = extract_token_from_headers(&headers) {
+        let _ = db.revoke_session_by_token(&token).await;
+    }
+
+    let is_htmx = headers
+        .get("HX-Request")
+        .and_then(|v| v.to_str().ok())
+        .is_some_and(|v| v.eq_ignore_ascii_case("true"));
+
+    let mut resp = if is_htmx {
+        let mut r = Html(String::new()).into_response();
+        if let Ok(hv) = HeaderValue::from_str("/web/login") {
+            r.headers_mut().insert("HX-Redirect", hv);
+        }
+        r
+    } else {
+        Redirect::to("/web/login").into_response()
+    };
+
+    if let Ok(cookie_val) = HeaderValue::from_str(&build_clear_session_cookie()) {
+        resp.headers_mut().insert(header::SET_COOKIE, cookie_val);
+    }
+    append_security_headers(resp.headers_mut());
+    resp
 }
