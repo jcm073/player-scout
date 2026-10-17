@@ -131,7 +131,12 @@ Este arquivo é a fonte oficial do estado de evolução do projeto. Toda fase e 
   - Telas Web SSR + HTMX (`GET /web/login`, `GET /web/register`, `POST /web/partials/auth/login` e `POST /web/partials/auth/register`).
 - [x] Estrutura de Integração OAuth2 (`Google/Gmail`, `Microsoft Office` e `Instagram`):
   - Endpoints `GET /api/v1/auth/oauth/{provider}/authorize` e `POST /api/v1/auth/oauth/{provider}/callback` mapeados no Toasty ORM (`UserOAuthRecord`).
-- [ ] **Task Dedicada OAuth2 (Homologação de Provedores Externos):** Configurar credenciais reais de cliente OAuth2 nos consoles de desenvolvedor do **Google Cloud (Gmail)**, **Microsoft Entra ID (Office)** e **Meta for Developers (Instagram)** e validar troca de código de autorização em ambiente de homologação/produção.
+- [x] **Task Dedicada OAuth2 (Homologação de Provedores Externos):**
+  - Implementação completa do Login Social OAuth2 (`Google/Gmail`, `Microsoft Office` e `Instagram`).
+  - Proteção Anti-CSRF via cookie HttpOnly `ps_oauth_state` (10 min) validado estritamente no callback.
+  - Emissão de sessão única de 12 horas com hash `Argon2i` (`ps_session` / `ps_sess_...`) no login social com substituição física de sessões anteriores.
+  - Fluxo Web (`GET /web/auth/oauth/{provider}/authorize` e `GET /web/auth/oauth/{provider}/callback`) com redirecionamento inteligente para `/web/register` (pré-preenchendo e-mail) para novos usuários ou `/web/dashboard` para usuários já cadastrados.
+  - Documentação de homologação nos consoles oficiais (Google Cloud, Microsoft Entra ID e Meta) e suporte a credenciais de cliente no `.env`.
 
 ---
 

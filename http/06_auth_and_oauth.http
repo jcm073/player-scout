@@ -198,6 +198,18 @@ Content-Type: application/json
   "new_password": "PadelRotated2026#$"
 }
 
-### 16. Logoff — Exclui fisicamente (`DELETE`) o token da sessão do banco de dados
+### 16. Login Social OAuth2 (Google/Gmail) com Validação de State e Emissão de Sessão Única (12h Argon2i)
+# @name oauthLoginGoogle
+POST {{baseUrl}}/api/v1/auth/oauth/google/login
+Content-Type: application/json
+
+{
+  "provider_user_id": "google-sub-9988776655",
+  "provider_email": "{{registerPlayer.response.body.user.email}}",
+  "state": "homolog-state-001",
+  "code": "4/0AeanS0bHomologCode"
+}
+
+### 17. Logoff — Exclui fisicamente (`DELETE`) o token da sessão do banco de dados
 POST {{baseUrl}}/api/v1/auth/logout
-Authorization: Bearer {{rotatePassword.response.body.session_token}}
+Authorization: Bearer {{oauthLoginGoogle.response.body.session_token}}

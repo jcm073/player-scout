@@ -778,7 +778,10 @@ fn generate_unique_valid_cpf(seed: u64) -> String {
 #[tokio::test]
 async fn test_phase_4_5_registration_argon2i_login_cpf_lookup_and_oauth() {
     use player_scout::{
-        api::auth::{AuthResponse, LoginRequest, OAuthAuthorizeResponse, OAuthCallbackRequest},
+        api::auth::{
+            AuthResponse, LoginRequest, OAuthAuthorizeResponse, OAuthCallbackRequest,
+            OAuthLoginRequest, OAuthLoginResponse,
+        },
         domain::{OAuthProvider, RegistrationInput, UserOAuthAccount},
     };
 
@@ -959,7 +962,7 @@ async fn test_phase_4_5_registration_argon2i_login_cpf_lookup_and_oauth() {
     assert_eq!(status, StatusCode::OK);
     assert_eq!(found_by_email.id, coach_auth.user.id);
 
-    // 7. Fluxo OAuth2 (Google/Gmail, Microsoft Office e Instagram)
+    // 7. Fluxo OAuth2 Homologado (Google/Gmail, Microsoft Office e Instagram)
     for provider in ["google", "microsoft", "instagram"] {
         let (status, auth_url_res): (StatusCode, OAuthAuthorizeResponse) = send_json::<(), _>(
             &app,
@@ -970,6 +973,8 @@ async fn test_phase_4_5_registration_argon2i_login_cpf_lookup_and_oauth() {
         .await;
         assert_eq!(status, StatusCode::OK);
         assert!(auth_url_res.authorize_url.starts_with("https://"));
+        assert!(auth_url_res.token_url.starts_with("https://"));
+        assert!(auth_url_res.userinfo_url.starts_with("https://"));
     }
 
     let (status, oauth_linked): (StatusCode, UserOAuthAccount) = send_json(
@@ -986,6 +991,149 @@ async fn test_phase_4_5_registration_argon2i_login_cpf_lookup_and_oauth() {
     assert_eq!(status, StatusCode::CREATED);
     assert_eq!(oauth_linked.provider, OAuthProvider::Google);
     assert_eq!(oauth_linked.user_id, player_auth.user.id);
+
+    // 8. Homologação E2E de Login Social OAuth2 com Anti-CSRF (`ps_oauth_state`) e Sessão Única 12h
+    let authz_req = Request::builder()
+        .method(Method::GET)
+        .uri("/api/v1/auth/oauth/google/authorize")
+        .body(Body::empty())
+        .unwrap();
+    let authz_res = app.clone().oneshot(authz_req).await.unwrap();
+    assert_eq!(authz_res.status(), StatusCode::OK);
+    let set_cookie_header = authz_res
+        .headers()
+        .get("set-cookie")
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .to_string();
+    assert!(set_cookie_header.contains("ps_oauth_state="));
+    let authz_bytes = axum::body::to_bytes(authz_res.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let authz_body: OAuthAuthorizeResponse = serde_json::from_slice(&authz_bytes).unwrap();
+    let valid_state = authz_body.state;
+
+    // 8a. Rejeita tentativa de Login OAuth2 com state Anti-CSRF divergente do cookie (403 Forbidden)
+    let csrf_fail_req = Request::builder()
+        .method(Method::POST)
+        .uri("/api/v1/auth/oauth/google/login")
+        .header("content-type", "application/json")
+        .header("cookie", format!("ps_oauth_state={valid_state}"))
+        .body(Body::from(
+            serde_json::to_vec(&OAuthLoginRequest {
+                provider_user_id: format!("google-uid-{unique_uuid}"),
+                provider_email: player_email.clone(),
+                state: Some("state-forjado-atacante".to_string()),
+                code: Some("auth_code_123".to_string()),
+            })
+            .unwrap(),
+        ))
+        .unwrap();
+    let csrf_fail_res = app.clone().oneshot(csrf_fail_req).await.unwrap();
+    assert_eq!(csrf_fail_res.status(), StatusCode::FORBIDDEN);
+
+    // 8b. Login OAuth2 válido emite novo token de sessão única de 12h (`ps_sess_...` Argon2i)
+    let oauth_login_req = Request::builder()
+        .method(Method::POST)
+        .uri("/api/v1/auth/oauth/google/login")
+        .header("content-type", "application/json")
+        .header("cookie", format!("ps_oauth_state={valid_state}"))
+        .body(Body::from(
+            serde_json::to_vec(&OAuthLoginRequest {
+                provider_user_id: format!("google-uid-{unique_uuid}"),
+                provider_email: player_email.clone(),
+                state: Some(valid_state.clone()),
+                code: Some("auth_code_123".to_string()),
+            })
+            .unwrap(),
+        ))
+        .unwrap();
+    let oauth_login_res = app.clone().oneshot(oauth_login_req).await.unwrap();
+    assert_eq!(oauth_login_res.status(), StatusCode::OK);
+    let oauth_session_cookie = oauth_login_res
+        .headers()
+        .get("set-cookie")
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .to_string();
+    assert!(oauth_session_cookie.contains("ps_session=ps_sess_"));
+    let oauth_login_bytes = axum::body::to_bytes(oauth_login_res.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let oauth_login_body: OAuthLoginResponse = serde_json::from_slice(&oauth_login_bytes).unwrap();
+    assert_eq!(oauth_login_body.user.id, player_auth.user.id);
+    assert!(oauth_login_body.session_token.starts_with("ps_sess_"));
+
+    // 8c. Fluxo Web OAuth2 (`/web/auth/oauth/google/authorize` e `/web/auth/oauth/google/callback`)
+    let web_authz_req = Request::builder()
+        .method(Method::GET)
+        .uri("/web/auth/oauth/google/authorize")
+        .body(Body::empty())
+        .unwrap();
+    let web_authz_res = app.clone().oneshot(web_authz_req).await.unwrap();
+    assert_eq!(web_authz_res.status(), StatusCode::SEE_OTHER);
+    assert!(
+        web_authz_res
+            .headers()
+            .get("location")
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .starts_with("https://accounts.google.com/o/oauth2/v2/auth")
+    );
+
+    // Callback Web para e-mail ainda não cadastrado -> redireciona para `/web/register?email=...`
+    let web_cb_new_req = Request::builder()
+        .method(Method::GET)
+        .uri(format!(
+            "/web/auth/oauth/google/callback?code=c1&state={valid_state}&email=novo.oauth.{unique_uuid}@playerscout.test"
+        ))
+        .header("cookie", format!("ps_oauth_state={valid_state}"))
+        .body(Body::empty())
+        .unwrap();
+    let web_cb_new_res = app.clone().oneshot(web_cb_new_req).await.unwrap();
+    assert_eq!(web_cb_new_res.status(), StatusCode::SEE_OTHER);
+    assert!(
+        web_cb_new_res
+            .headers()
+            .get("location")
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .starts_with("/web/register?email=novo.oauth.")
+    );
+
+    // Callback Web para usuário já cadastrado -> emite cookie `ps_session` (12h) e redireciona para `/web/dashboard`
+    let web_cb_ok_req = Request::builder()
+        .method(Method::GET)
+        .uri(format!(
+            "/web/auth/oauth/microsoft/callback?code=ms_code&state={valid_state}&email={coach_email}&provider_user_id=ms-uid-{unique_uuid}"
+        ))
+        .header("cookie", format!("ps_oauth_state={valid_state}"))
+        .body(Body::empty())
+        .unwrap();
+    let web_cb_ok_res = app.clone().oneshot(web_cb_ok_req).await.unwrap();
+    assert_eq!(web_cb_ok_res.status(), StatusCode::SEE_OTHER);
+    assert!(
+        web_cb_ok_res
+            .headers()
+            .get("location")
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .starts_with("/web/dashboard?actor_id=")
+    );
+    assert!(
+        web_cb_ok_res
+            .headers()
+            .get("set-cookie")
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .contains("ps_session=ps_sess_")
+    );
 }
 
 #[tokio::test]

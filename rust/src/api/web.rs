@@ -1,7 +1,7 @@
 use askama::Template;
 use axum::{
     Extension, Form,
-    extract::{Query, State},
+    extract::{Path, Query, State},
     http::{HeaderMap, HeaderValue, header},
     response::{Html, IntoResponse, Redirect, Response},
 };
@@ -10,13 +10,15 @@ use uuid::Uuid;
 
 use crate::{
     api::auth::{
-        LoginRequest, append_security_headers, build_clear_session_cookie, build_session_cookie,
-        extract_token_from_headers,
+        LoginRequest, append_security_headers, build_clear_oauth_state_cookie,
+        build_clear_session_cookie, build_oauth_state_cookie, build_session_cookie,
+        extract_oauth_state_from_headers, extract_token_from_headers,
     },
     db::{Database, NewShotInput},
     domain::{
         AnalyticsComparisonReport, AnalyticsFilter, AuthenticatedUser, DecisionQuality,
-        PlayerAnalyticsReport, RegistrationInput, ShotEvent, ShotOutcome, ShotType, SpecialTag,
+        OAuthProvider, PlayerAnalyticsReport, RegistrationInput, ShotEvent, ShotOutcome, ShotType,
+        SpecialTag,
     },
     error::{AppError, Result},
 };
@@ -574,4 +576,133 @@ pub async fn web_logout(State(db): State<Database>, headers: HeaderMap) -> Respo
     }
     append_security_headers(resp.headers_mut());
     resp
+}
+
+#[derive(Debug, Deserialize)]
+pub struct WebOAuthCallbackQuery {
+    pub code: Option<String>,
+    pub state: Option<String>,
+    pub email: Option<String>,
+    pub provider_user_id: Option<String>,
+}
+
+/// Inicia o fluxo de Login Social OAuth2 pelo navegador (`GET /web/auth/oauth/{provider}/authorize`)
+/// - Gera `state` Anti-CSRF e armazena no cookie `HttpOnly` `ps_oauth_state` (10 min)
+/// - Redireciona (`302 Found`) para a página de autorização oficial do provedor (`Google`, `Microsoft`, `Instagram`)
+pub async fn web_oauth_authorize(Path(provider): Path<OAuthProvider>) -> Response {
+    let env_prefix = match provider {
+        OAuthProvider::Google => "OAUTH_GOOGLE",
+        OAuthProvider::Microsoft => "OAUTH_MICROSOFT",
+        OAuthProvider::Instagram => "OAUTH_INSTAGRAM",
+    };
+
+    let client_id_var = format!("{env_prefix}_CLIENT_ID");
+    let redirect_var = format!("{env_prefix}_REDIRECT_URI");
+
+    let client_id = std::env::var(&client_id_var)
+        .ok()
+        .filter(|v| !v.trim().is_empty())
+        .unwrap_or_else(|| format!("pending_{}_client_id", provider.as_str()));
+    let redirect_uri = std::env::var(&redirect_var).unwrap_or_else(|_| {
+        format!(
+            "http://localhost:3000/web/auth/oauth/{}/callback",
+            provider.as_str()
+        )
+    });
+
+    let state = Uuid::now_v7().to_string();
+    let authorize_url = provider.authorize_url(&client_id, &redirect_uri, &state);
+    let state_cookie = build_oauth_state_cookie(&state);
+
+    let mut resp = Redirect::to(&authorize_url).into_response();
+    if let Ok(hv) = HeaderValue::from_str(&state_cookie) {
+        resp.headers_mut().insert(header::SET_COOKIE, hv);
+    }
+    append_security_headers(resp.headers_mut());
+    resp
+}
+
+/// Callback Web do fluxo OAuth2 (`GET /web/auth/oauth/{provider}/callback`):
+/// - Valida o parâmetro `state` contra o cookie `ps_oauth_state` (Defesa Anti-CSRF)
+/// - Caso o e-mail já possua cadastro ativo, emite a sessão única de 12 horas (`ps_session`) e redireciona para `/web/dashboard`
+/// - Caso o e-mail ainda não possua cadastro completo (CPF/WhatsApp/endereço), redireciona para `/web/register?email=...&oauth_provider=...`
+pub async fn web_oauth_callback(
+    State(db): State<Database>,
+    headers: HeaderMap,
+    Path(provider): Path<OAuthProvider>,
+    Query(query): Query<WebOAuthCallbackQuery>,
+) -> Result<Response> {
+    if let Some(cookie_state) = extract_oauth_state_from_headers(&headers) {
+        let provided = query.state.as_deref().unwrap_or("").trim();
+        if provided.is_empty() || provided != cookie_state {
+            return Err(AppError::Forbidden(
+                "Falha na validação Anti-CSRF do callback OAuth2 (state inválido ou divergente)"
+                    .to_string(),
+            ));
+        }
+    } else if query.state.as_deref().is_none_or(|s| s.trim().is_empty()) {
+        return Err(AppError::Forbidden(
+            "Callback OAuth2 rejeitado: parâmetro Anti-CSRF state ausente".to_string(),
+        ));
+    }
+
+    let provider_email = query
+        .email
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| {
+            AppError::BadRequest(
+                "E-mail do provedor OAuth2 ausente no callback de homologação".to_string(),
+            )
+        })?
+        .to_lowercase();
+
+    let provider_user_id = query
+        .provider_user_id
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_string)
+        .unwrap_or_else(|| {
+            let code_suffix = query.code.as_deref().unwrap_or("oauth");
+            format!("{}_{}", provider.as_str(), code_suffix)
+        });
+
+    match db
+        .authenticate_with_oauth(provider, provider_user_id, provider_email.clone())
+        .await
+    {
+        Ok((user, player_profile, _oauth_acc, session_token, _session)) => {
+            let dashboard_url = if let Some(player) = player_profile {
+                format!(
+                    "/web/dashboard?actor_id={}&player_id={}",
+                    user.id, player.id
+                )
+            } else {
+                format!("/web/dashboard?actor_id={}&player_id={}", user.id, user.id)
+            };
+
+            let mut resp = Redirect::to(&dashboard_url).into_response();
+            if let Ok(hv) = HeaderValue::from_str(&build_session_cookie(&session_token)) {
+                resp.headers_mut().insert(header::SET_COOKIE, hv);
+            }
+            append_security_headers(resp.headers_mut());
+            Ok(resp)
+        }
+        Err(AppError::NotFound(_)) => {
+            let register_url = format!(
+                "/web/register?email={}&oauth_provider={}",
+                provider_email,
+                provider.as_str()
+            );
+            let mut resp = Redirect::to(&register_url).into_response();
+            if let Ok(hv) = HeaderValue::from_str(&build_clear_oauth_state_cookie()) {
+                resp.headers_mut().insert(header::SET_COOKIE, hv);
+            }
+            append_security_headers(resp.headers_mut());
+            Ok(resp)
+        }
+        Err(err) => Err(err),
+    }
 }

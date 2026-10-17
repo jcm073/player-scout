@@ -11,8 +11,9 @@ use uuid::Uuid;
 use crate::{
     db::Database,
     domain::{
-        AuthenticatedUser, OAuthProvider, Player, RegistrationInput, SESSION_COOKIE_NAME,
-        SESSION_TTL_SECONDS, User, UserOAuthAccount, UserSession, extract_bearer_token,
+        AuthenticatedUser, OAUTH_STATE_COOKIE_NAME, OAUTH_STATE_TTL_SECONDS, OAuthProvider, Player,
+        RegistrationInput, SESSION_COOKIE_NAME, SESSION_TTL_SECONDS, User, UserOAuthAccount,
+        UserSession, extract_bearer_token, extract_oauth_state_from_cookie,
         extract_session_token_from_cookie,
     },
     error::{AppError, Result},
@@ -63,8 +64,11 @@ pub struct OAuthAuthorizeResponse {
     pub provider: OAuthProvider,
     pub provider_name: String,
     pub authorize_url: String,
+    pub token_url: String,
+    pub userinfo_url: String,
     pub state: String,
     pub configured_in_env: bool,
+    pub client_secret_configured: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -72,6 +76,23 @@ pub struct OAuthCallbackRequest {
     pub user_id: Uuid,
     pub provider_user_id: String,
     pub provider_email: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OAuthLoginRequest {
+    pub provider_user_id: String,
+    pub provider_email: String,
+    pub state: Option<String>,
+    pub code: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OAuthLoginResponse {
+    pub user: User,
+    pub player_profile: Option<Player>,
+    pub oauth_account: UserOAuthAccount,
+    pub session_token: String,
+    pub session: UserSession,
 }
 
 /// Constrói o cabeçalho `Set-Cookie` seguro (`HttpOnly`, `SameSite=Lax`, `Max-Age=43200` / 12 horas)
@@ -84,6 +105,28 @@ pub fn build_session_cookie(raw_token: &str) -> String {
 /// Constrói o cabeçalho `Set-Cookie` que limpa imediatamente o cookie de sessão no navegador
 pub fn build_clear_session_cookie() -> String {
     format!("{SESSION_COOKIE_NAME}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0")
+}
+
+/// Constrói o cabeçalho `Set-Cookie` para o estado Anti-CSRF do fluxo OAuth2 (validade: 10 minutos)
+pub fn build_oauth_state_cookie(state: &str) -> String {
+    format!(
+        "{OAUTH_STATE_COOKIE_NAME}={state}; Path=/; HttpOnly; SameSite=Lax; Max-Age={OAUTH_STATE_TTL_SECONDS}"
+    )
+}
+
+/// Constrói o cabeçalho `Set-Cookie` que limpa o estado Anti-CSRF OAuth2 após uso
+pub fn build_clear_oauth_state_cookie() -> String {
+    format!("{OAUTH_STATE_COOKIE_NAME}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0")
+}
+
+/// Extrai o estado Anti-CSRF `ps_oauth_state` do cabeçalho `Cookie`
+pub fn extract_oauth_state_from_headers(headers: &HeaderMap) -> Option<String> {
+    if let Some(cookie_val) = headers.get(header::COOKIE)
+        && let Ok(cookie_str) = cookie_val.to_str()
+    {
+        return extract_oauth_state_from_cookie(cookie_str);
+    }
+    None
 }
 
 /// Extrai o token de sessão a partir do header `Authorization: Bearer <token>` ou do cookie `ps_session`
@@ -363,10 +406,9 @@ pub async fn lookup_user(
 }
 
 /// Endpoint de Início do Fluxo OAuth2 (`GET /api/v1/auth/oauth/{provider}/authorize`)
-/// Suporta `google` (Gmail), `microsoft` (Microsoft Office) e `instagram`
-pub async fn oauth_authorize(
-    Path(provider): Path<OAuthProvider>,
-) -> Result<Json<OAuthAuthorizeResponse>> {
+/// Suporta `google` (Gmail), `microsoft` (Microsoft Office) e `instagram`.
+/// Emite o cookie HttpOnly Anti-CSRF `ps_oauth_state` (validade: 10 minutos).
+pub async fn oauth_authorize(Path(provider): Path<OAuthProvider>) -> Result<Response> {
     let env_prefix = match provider {
         OAuthProvider::Google => "OAUTH_GOOGLE",
         OAuthProvider::Microsoft => "OAUTH_MICROSOFT",
@@ -374,10 +416,15 @@ pub async fn oauth_authorize(
     };
 
     let client_id_var = format!("{env_prefix}_CLIENT_ID");
+    let client_secret_var = format!("{env_prefix}_CLIENT_SECRET");
     let redirect_var = format!("{env_prefix}_REDIRECT_URI");
 
     let client_id_env = std::env::var(&client_id_var).ok();
     let configured_in_env = client_id_env
+        .as_deref()
+        .is_some_and(|v| !v.trim().is_empty());
+    let client_secret_configured = std::env::var(&client_secret_var)
+        .ok()
         .as_deref()
         .is_some_and(|v| !v.trim().is_empty());
 
@@ -391,17 +438,83 @@ pub async fn oauth_authorize(
     });
     let state = Uuid::now_v7().to_string();
     let authorize_url = provider.authorize_url(&client_id, &redirect_uri, &state);
+    let state_cookie = build_oauth_state_cookie(&state);
 
-    Ok(Json(OAuthAuthorizeResponse {
-        provider,
-        provider_name: provider.display_name().to_string(),
-        authorize_url,
-        state,
-        configured_in_env,
-    }))
+    let mut resp = (
+        StatusCode::OK,
+        Json(OAuthAuthorizeResponse {
+            provider,
+            provider_name: provider.display_name().to_string(),
+            authorize_url,
+            token_url: provider.token_url().to_string(),
+            userinfo_url: provider.userinfo_url().to_string(),
+            state,
+            configured_in_env,
+            client_secret_configured,
+        }),
+    )
+        .into_response();
+
+    if let Ok(hv) = HeaderValue::from_str(&state_cookie) {
+        resp.headers_mut().insert(header::SET_COOKIE, hv);
+    }
+    append_security_headers(resp.headers_mut());
+
+    Ok(resp)
 }
 
-/// Endpoint de Callback / Vínculo OAuth2 (`POST /api/v1/auth/oauth/{provider}/callback`)
+/// Endpoint Público de Login / Homologação OAuth2 (`POST /api/v1/auth/oauth/{provider}/login`)
+/// - Valida o parâmetro Anti-CSRF `state` contra o cookie `ps_oauth_state` (quando presente)
+/// - Localiza ou vincula a conta OAuth2 ao usuário cadastrado pelo e-mail verificado
+/// - Emite o token de sessão única de 12 horas (`ps_sess_...` com hash Argon2i), substituindo sessões anteriores
+pub async fn oauth_login(
+    State(db): State<Database>,
+    headers: HeaderMap,
+    Path(provider): Path<OAuthProvider>,
+    Json(payload): Json<OAuthLoginRequest>,
+) -> Result<Response> {
+    if let Some(cookie_state) = extract_oauth_state_from_headers(&headers) {
+        let provided = payload.state.as_deref().unwrap_or("").trim();
+        if provided.is_empty() || provided != cookie_state {
+            return Err(AppError::Forbidden(
+                "Falha na validação Anti-CSRF do estado OAuth2 (state ausente ou divergente do cookie ps_oauth_state)"
+                    .to_string(),
+            ));
+        }
+    } else if let Some(provided) = payload.state.as_deref()
+        && provided.trim().is_empty()
+    {
+        return Err(AppError::Forbidden(
+            "O parâmetro Anti-CSRF state OAuth2 não pode ser vazio".to_string(),
+        ));
+    }
+
+    let (user, player_profile, oauth_account, session_token, session) = db
+        .authenticate_with_oauth(provider, payload.provider_user_id, payload.provider_email)
+        .await?;
+
+    let session_cookie = build_session_cookie(&session_token);
+    let mut resp = (
+        StatusCode::OK,
+        Json(OAuthLoginResponse {
+            user,
+            player_profile,
+            oauth_account,
+            session_token,
+            session,
+        }),
+    )
+        .into_response();
+
+    if let Ok(hv) = HeaderValue::from_str(&session_cookie) {
+        resp.headers_mut().insert(header::SET_COOKIE, hv);
+    }
+    append_security_headers(resp.headers_mut());
+
+    Ok(resp)
+}
+
+/// Endpoint Protegido de Vínculo Manual OAuth2 (`POST /api/v1/auth/oauth/{provider}/callback`)
 pub async fn oauth_callback(
     State(db): State<Database>,
     Extension(auth_user): Extension<AuthenticatedUser>,
