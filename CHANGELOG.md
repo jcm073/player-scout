@@ -61,3 +61,20 @@ O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.
   - Tratamento de erros centralizado (`error::AppError` implementando `IntoResponse` do Axum) e configuração de ambiente (`config::AppConfig`).
   - Router Axum e endpoint de health check (`/health` e `/api/v1/health`).
   - Suíte de 8 testes unitários automatizados em Rust com 100% de aprovação e validação estrita com `cargo fmt` e `cargo clippy`.
+- **Persistência com Toasty ORM (`0.11.0`) & Endpoints REST de Quadra (Conclusão das Fases 1 e 2):**
+  - Mapeamento nativo de enums PostgreSQL (`#[derive(toasty::Embed)]` com `#[column(type = enum("..."))]`) para `UserRole`, `DominantHand`, `PreferredSide`, `MatchStatus`, `ShotType` (21 golpes), `ShotOutcome`, `DecisionQuality` e `SpecialTag`.
+  - Modelos Toasty (`src/db/models.rs`) mapeados para `users`, `players`, `coach_players` (chave composta `partition = coach_id, local = player_id`), `matches` e `shot_events` com geração de UUIDv7 ordenado no tempo.
+  - Repositório assíncrono `Database` (`src/db/mod.rs`) com controle de acesso baseado em perfil (RBAC):
+    - `Player` estritamente somente leitura e isolado ao próprio histórico (`403 Forbidden` em tentativas de escrita ou leitura de outros atletas).
+    - `Coach` com acesso aos seus atletas vinculados na tabela associativa N:N `coach_players`.
+    - `Admin` com visão global do sistema.
+  - Endpoints REST (`src/api/users.rs`, `src/api/players.rs`, `src/api/matches.rs`, `src/api/shots.rs`):
+    - `POST /api/v1/users`, `GET /api/v1/users`, `GET /api/v1/users/{id}`
+    - `POST /api/v1/players`, `GET /api/v1/players`, `GET /api/v1/players/{id}`
+    - `POST /api/v1/players/{id}/coaches`, `GET /api/v1/players/{id}/coaches`
+    - `POST /api/v1/matches`, `GET /api/v1/matches/{id}`
+    - `POST /api/v1/matches/{id}/shots`, `GET /api/v1/matches/{id}/shots` e `POST /api/v1/matches/{id}/shots/undo` (rollback da última jogada por ordenação decrescente de UUIDv7).
+  - Suíte de testes de integração fim a fim (`rust/tests/api_integration_tests.rs`) validando persistência real no PostgreSQL 18, relacionamento N:N multi-coach, isolamento RBAC e undo de jogadas (9/9 testes aprovados).
+  - Coleção dedicada de scripts `.http` em `http/` para o plugin **REST Client** (`00_health.http`, `01_users.http`, `02_players_and_rbac.http`, `03_matches_and_shots.http` e `99_full_e2e_workflow.http` com encadeamento automático de variáveis `# @name`).
+
+

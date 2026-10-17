@@ -1,24 +1,10 @@
-use player_scout::{AppConfig, create_app};
+use player_scout::{AppConfig, Database, create_app};
 use tracing::info;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let config = match AppConfig::from_env() {
-        Ok(cfg) => cfg,
-        Err(err) => {
-            eprintln!(
-                "Aviso: Falha ao carregar configuração completa ({err}). Usando padrões de desenvolvimento."
-            );
-            AppConfig {
-                database_url: "postgresql://postgres:scout123@localhost:5432/playerscout_dev"
-                    .to_string(),
-                server_host: "0.0.0.0".to_string(),
-                server_port: 3000,
-                rust_log: "info,player_scout=debug".to_string(),
-            }
-        }
-    };
+    let config = AppConfig::from_env()?;
 
     tracing_subscriber::registry()
         .with(
@@ -28,9 +14,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    info!("🎾 Inicializando Player Scout Backend (Axum + PostgreSQL 18)");
+    info!("🎾 Inicializando Player Scout Backend (Axum + Toasty ORM + PostgreSQL 18)");
 
-    let app = create_app();
+    let db = Database::connect(&config.database_url).await?;
+    let app = create_app(db);
     let addr = config.server_addr();
     let listener = tokio::net::TcpListener::bind(&addr).await?;
 

@@ -108,8 +108,18 @@ player-scout/
 ├── README.md            # Esta documentação geral
 ├── docker-compose.yml   # PostgreSQL 18 e serviço MCP containerizado
 ├── migrations/          # Migrações relacionais do PostgreSQL
-└── rust/                # Código-fonte do backend e testes em Rust (a ser criado)
+├── http/                # Scripts de teste interativo da API REST para o plugin REST Client
+└── rust/                # Backend em Rust (Axum, Toasty ORM, Domínio e Testes)
 ```
+
+### 🧪 Executando os Testes da API
+
+- **Testes Automatizados em Rust (100% de cobertura de contratos e integração):**
+  ```bash
+  cargo test --manifest-path rust/Cargo.toml
+  ```
+- **Testes Manuais / Interativos com o plugin REST Client:**
+  Consulte a pasta [`http/`](file:///home/jc/codigos/rust/player-scout/http) e abra [`http/99_full_e2e_workflow.http`](file:///home/jc/codigos/rust/player-scout/http/99_full_e2e_workflow.http) para executar o fluxo sequencial auto-encadeado.
 
 ---
 

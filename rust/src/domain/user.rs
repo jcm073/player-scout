@@ -2,8 +2,9 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, toasty::Embed)]
 #[serde(rename_all = "snake_case")]
+#[column(type = enum("user_role_enum"))]
 pub enum UserRole {
     Admin,
     Coach,
@@ -48,7 +49,7 @@ pub struct User {
     pub role: UserRole,
     pub name: String,
     pub email: String,
-    #[serde(skip_serializing)]
+    #[serde(skip_serializing, default)]
     pub password_hash: String,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -62,7 +63,7 @@ impl User {
     ) -> Self {
         let now = Utc::now();
         Self {
-            id: Uuid::new_v4(),
+            id: Uuid::now_v7(),
             role: UserRole::Coach,
             name: name.into(),
             email: email.into(),
@@ -79,7 +80,7 @@ impl User {
     ) -> Self {
         let now = Utc::now();
         Self {
-            id: Uuid::new_v4(),
+            id: Uuid::now_v7(),
             role: UserRole::Admin,
             name: name.into(),
             email: email.into(),
@@ -96,7 +97,7 @@ impl User {
     ) -> Self {
         let now = Utc::now();
         Self {
-            id: Uuid::new_v4(),
+            id: Uuid::now_v7(),
             role: UserRole::Player,
             name: name.into(),
             email: email.into(),

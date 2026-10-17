@@ -1,0 +1,171 @@
+### ============================================================================
+### Player Scout API — 99. Fluxo Completo Fim a Fim (Auto-Encadeado)
+### Clique em "Send Request" de cima para baixo: todas as variáveis de ID
+### ({{createCoachTech.response.body.id}}, etc.) são preenchidas automaticamente!
+### ============================================================================
+
+@baseUrl = http://localhost:3000/api/v1
+@runId = {{$guid}}
+
+### Passo 1: Health Check da API
+# @name healthCheck
+GET {{baseUrl}}/health
+Accept: application/json
+
+###
+
+### Passo 2: Criar Treinador Técnico (Coach 1)
+# @name createCoachTech
+POST {{baseUrl}}/users
+Content-Type: application/json
+
+{
+  "role": "coach",
+  "name": "Treinador Técnico Padel",
+  "email": "coach.tech.{{runId}}@playerscout.example",
+  "password_hash": "hash_ficticio_coach_tech"
+}
+
+###
+
+### Passo 3: Criar Treinador Tático (Coach 2)
+# @name createCoachTactical
+POST {{baseUrl}}/users
+Content-Type: application/json
+
+{
+  "role": "coach",
+  "name": "Treinador Tático Padel",
+  "email": "coach.tactical.{{runId}}@playerscout.example",
+  "password_hash": "hash_ficticio_coach_tactical"
+}
+
+###
+
+### Passo 4: Criar Usuário com Perfil Player (Atleta Read-Only)
+# @name createAthleteUser
+POST {{baseUrl}}/users
+Content-Type: application/json
+
+{
+  "role": "player",
+  "name": "Atleta Exemplo",
+  "email": "atleta.{{runId}}@playerscout.example",
+  "password_hash": "hash_ficticio_atleta"
+}
+
+###
+
+### Passo 5: Cadastrar Ficha do Atleta vinculada ao Usuário Player
+# @name createPlayerProfile
+POST {{baseUrl}}/players
+Content-Type: application/json
+
+{
+  "actor_id": "{{createCoachTech.response.body.id}}",
+  "user_id": "{{createAthleteUser.response.body.id}}",
+  "name": "Atleta Exemplo",
+  "dominant_hand": "right_handed",
+  "preferred_side": "left",
+  "category": "1ª Categoria"
+}
+
+###
+
+### Passo 6: Vincular o Segundo Treinador (Tático) ao mesmo Atleta (Relação N:N)
+# @name assignSecondCoach
+POST {{baseUrl}}/players/{{createPlayerProfile.response.body.id}}/coaches
+Content-Type: application/json
+
+{
+  "actor_id": "{{createCoachTech.response.body.id}}",
+  "coach_id": "{{createCoachTactical.response.body.id}}"
+}
+
+###
+
+### Passo 7: Listar Treinadores do Atleta (Consultado pelo próprio Atleta)
+# @name listPlayerCoaches
+GET {{baseUrl}}/players/{{createPlayerProfile.response.body.id}}/coaches?actor_id={{createAthleteUser.response.body.id}}
+Accept: application/json
+
+###
+
+### Passo 8: Criar Partida para o Atleta (Iniciada pelo Treinador Tático)
+# @name createMatch
+POST {{baseUrl}}/matches
+Content-Type: application/json
+
+{
+  "actor_id": "{{createCoachTactical.response.body.id}}",
+  "player_id": "{{createPlayerProfile.response.body.id}}",
+  "opponent_name": "Dupla Visitante",
+  "notes": "Torneio Regional - Quadra Central"
+}
+
+###
+
+### Passo 9: Registrar Jogada 1 — Saque Acertou (Decisão Boa por padrão)
+# @name shot1
+POST {{baseUrl}}/matches/{{createMatch.response.body.id}}/shots
+Content-Type: application/json
+
+{
+  "actor_id": "{{createCoachTactical.response.body.id}}",
+  "player_id": "{{createPlayerProfile.response.body.id}}",
+  "set_number": 1,
+  "shot_type": "saque",
+  "outcome": "hit"
+}
+
+###
+
+### Passo 10: Registrar Jogada 2 — Smash x3 Winner (Acertou + Boa + Winner)
+# @name shot2
+POST {{baseUrl}}/matches/{{createMatch.response.body.id}}/shots
+Content-Type: application/json
+
+{
+  "actor_id": "{{createCoachTactical.response.body.id}}",
+  "player_id": "{{createPlayerProfile.response.body.id}}",
+  "set_number": 1,
+  "shot_type": "smash_x3",
+  "outcome": "hit",
+  "decision": "good",
+  "special_tag": "winner"
+}
+
+###
+
+### Passo 11: Registrar Jogada 3 — Bajada de Parede (Errou + Decisão Ruim + Erro Não Forçado)
+# @name shot3
+POST {{baseUrl}}/matches/{{createMatch.response.body.id}}/shots
+Content-Type: application/json
+
+{
+  "actor_id": "{{createCoachTactical.response.body.id}}",
+  "player_id": "{{createPlayerProfile.response.body.id}}",
+  "set_number": 1,
+  "shot_type": "bajada_parede",
+  "outcome": "miss",
+  "decision": "bad",
+  "special_tag": "unforced_error"
+}
+
+###
+
+### Passo 12: Desfazer Última Jogada (Undo da Jogada 3)
+# @name undoShot3
+POST {{baseUrl}}/matches/{{createMatch.response.body.id}}/shots/undo
+Content-Type: application/json
+
+{
+  "actor_id": "{{createCoachTactical.response.body.id}}"
+}
+
+###
+
+### Passo 13: Consultar Jogadas Restantes da Partida como Atleta (Read-Only)
+# @name listMatchShots
+GET {{baseUrl}}/matches/{{createMatch.response.body.id}}/shots?actor_id={{createAthleteUser.response.body.id}}
+Accept: application/json

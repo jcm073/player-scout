@@ -5,8 +5,9 @@ use uuid::Uuid;
 use super::DomainError;
 
 /// Catálogo Oficial com as 21 jogadas mapeadas no Padel
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, toasty::Embed)]
 #[serde(rename_all = "snake_case")]
+#[column(type = enum("shot_type_enum"))]
 pub enum ShotType {
     // Início de Ponto
     Saque,
@@ -18,7 +19,9 @@ pub enum ShotType {
     Bandeja,
     Vibora,
     SmashPotencia,
+    #[column(variant = "smash_x3")]
     SmashX3,
+    #[column(variant = "smash_x4")]
     SmashX4,
     Rulo,
     Deixadinha,
@@ -74,16 +77,18 @@ impl ShotType {
 }
 
 /// Resultado obrigatório da execução do golpe
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, toasty::Embed)]
 #[serde(rename_all = "snake_case")]
+#[column(type = enum("shot_outcome_enum"))]
 pub enum ShotOutcome {
     Hit,
     Miss,
 }
 
 /// Qualidade da decisão tática do jogador (Padrão: Good)
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, toasty::Embed)]
 #[serde(rename_all = "snake_case")]
+#[column(type = enum("decision_quality_enum"))]
 pub enum DecisionQuality {
     #[default]
     Good,
@@ -91,8 +96,9 @@ pub enum DecisionQuality {
 }
 
 /// Marcador especial opcional da jogada
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, toasty::Embed)]
 #[serde(rename_all = "snake_case")]
+#[column(type = enum("special_tag_enum"))]
 pub enum SpecialTag {
     Winner,
     UnforcedError,
@@ -123,7 +129,7 @@ impl ShotEvent {
         special_tag: Option<SpecialTag>,
     ) -> Result<Self, DomainError> {
         let event = Self {
-            id: Uuid::new_v4(),
+            id: Uuid::now_v7(),
             match_id,
             player_id,
             set_number,
