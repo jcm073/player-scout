@@ -9,12 +9,12 @@ Este arquivo é a fonte oficial do estado de evolução do projeto. Toda fase e 
 | Fase | Descrição | Status | Progresso |
 | :--- | :--- | :---: | :---: |
 | **Fase 0** | Definições de Domínio, Wireframes & Documentação | **Concluído** | 100% |
-| **Fase 1** | Banco de Dados PostgreSQL 18+ & Modelagem com Toasty ORM | **Em Andamento** | 80% |
-| **Fase 2** | Backend Rust (Axum, API REST & Ingestão em Quadra) | **Pendente** | 0% |
-| **Fase 3** | Motor Analítico, Agregação Recursiva & Modo Comparativo | **Pendente** | 0% |
+| **Fase 1** | Banco de Dados PostgreSQL 18+ & Modelagem com Toasty ORM | **Concluído** | 100% |
+| **Fase 2** | Backend Rust (Axum, API REST & Ingestão em Quadra) | **Concluído** | 100% |
+| **Fase 3** | Motor Analítico, Agregação Recursiva & Modo Comparativo | **Em Andamento** | 0% |
 | **Fase 4** | Frontend Web (Askama, HTMX 4.x, Chart.js & Mobile Touch) | **Pendente** | 0% |
 | **Fase 5** | Clientes Móveis (Kotlin / KMP para Android e iOS) | **Pendente** | 0% |
-| **Fase 6** | Testes Automatizados 100% em Rust, CI/CD & Auditoria | **Pendente** | 0% |
+| **Fase 6** | Testes Automatizados 100% em Rust, CI/CD & Auditoria | **Em Andamento** | 50% |
 
 > **Legenda de Status:**
 > - `[x]` Concluído
@@ -56,7 +56,7 @@ Este arquivo é a fonte oficial do estado de evolução do projeto. Toda fase e 
 - [x] Criação dos índices compostos para agregação rápida por partida/set e por range de datas do jogador.
 - [x] Migração `002_user_roles.sql`: Criação da tabela `users` com perfis `admin` e `coach`.
 - [x] Migração `003_player_role_and_multi_coach.sql`: Perfil `player` (read-only), `user_id` em `players` e tabela `coach_players` (N:N múltiplos treinadores).
-- [ ] Configuração e mapeamento das entidades usando o ORM **Toasty** (`tokio-rs/toasty`) no backend Rust.
+- [x] Configuração e mapeamento das entidades usando o ORM **Toasty** (`tokio-rs/toasty` v0.11.0) no backend Rust (`src/db/models.rs` e `src/db/mod.rs`).
 
 ---
 
@@ -68,19 +68,20 @@ Este arquivo é a fonte oficial do estado de evolução do projeto. Toda fase e 
   - Perfis de usuário `UserRole` (`Admin`, `Coach`, `Player`) com permissões (`can_write_shots`, `is_read_only`).
   - Entidades `Player`, `CoachPlayer` (relação N:N), `MatchSession`.
   - 8 testes unitários de regras esportivas com 100% de aprovação.
-- [~] Configuração do Toasty ORM e pool de conexão com PostgreSQL 18. 📍 **ETAPA ATUAL**
-- [ ] Endpoints REST de Gestão:
-  - `POST /api/v1/users` / Autenticação
-  - `POST /api/v1/players` / `GET /api/v1/players`
-  - `POST /api/v1/matches` / `GET /api/v1/matches/{id}`
-- [ ] Endpoints de Registro em Quadra (Baixa Latência):
-  - `POST /api/v1/matches/{id}/shots` (ingestão atômica de jogada com confirmação instantânea).
-  - `POST /api/v1/matches/{id}/shots/undo` (desfazer o último registro com rollback seguro).
+- [x] Configuração do Toasty ORM e pool de conexão com PostgreSQL 18.
+- [x] Endpoints REST de Gestão (`src/api/`):
+  - `POST /api/v1/users`, `GET /api/v1/users`, `GET /api/v1/users/{id}`
+  - `POST /api/v1/players`, `GET /api/v1/players`, `GET /api/v1/players/{id}`
+  - `POST /api/v1/players/{id}/coaches`, `GET /api/v1/players/{id}/coaches`
+  - `POST /api/v1/matches`, `GET /api/v1/matches/{id}`
+- [x] Endpoints de Registro em Quadra (Baixa Latência):
+  - `POST /api/v1/matches/{id}/shots` e `GET /api/v1/matches/{id}/shots` (ingestão atômica de jogada com confirmação instantânea).
+  - `POST /api/v1/matches/{id}/shots/undo` (desfazer o último registro ordenado por UUIDv7 com rollback seguro).
 
 ---
 
 ### Fase 3: Motor Analítico & Modo Comparativo
-- [ ] Implementação de queries agregadas e métricas recursivas:
+- [~] Implementação de queries agregadas e métricas recursivas: 📍 **ETAPA ATUAL**
   - Taxa geral de acerto (% In vs % Out).
   - Qualidade de decisão (% Boa vs % Ruim).
   - Saldo W/UE (`Winners` vs `Erros Não Forçados`).
@@ -123,11 +124,11 @@ Este arquivo é a fonte oficial do estado de evolução do projeto. Toda fase e 
 ---
 
 ### Fase 6: Testes Automatizados (100% em Rust) & Auditoria
-- [ ] Testes unitários em Rust para validações de regras de negócio esportivas.
-- [ ] Testes de integração em Rust contra o PostgreSQL 18+ (validando persistência, constraints e queries do Toasty).
+- [x] Testes unitários em Rust para validações de regras de negócio esportivas.
+- [x] Testes de integração em Rust contra o PostgreSQL 18+ (validando persistência, constraints e queries do Toasty).
 - [ ] Testes em Rust para cálculos matemáticos analíticos e deltas do comparativo.
 - [ ] Testes de contrato de interface Web (validando respostas HTMX e Askama).
-- [ ] Pipeline de validação estática: `cargo fmt --check`, `cargo clippy -- -D warnings`.
+- [x] Pipeline de validação estática: `cargo fmt --check`, `cargo clippy -- -D warnings`.
 - [ ] Auditoria de segurança de dependências com `cargo audit`.
 
 ---

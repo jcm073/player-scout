@@ -1,0 +1,142 @@
+### ============================================================================
+### Player Scout API — 03. Partidas, Ingestão de Golpes do Padel e Undo
+### ============================================================================
+
+@baseUrl = http://localhost:3000/api/v1
+
+# Substitua pelos UUIDs gerados ou utilize o 99_full_e2e_workflow.http:
+@coachId = 00000000-0000-0000-0000-000000000001
+@playerUserId = 00000000-0000-0000-0000-000000000003
+@playerId = 00000000-0000-0000-0000-000000000010
+
+### 1. Iniciar Nova Partida / Sessão de Scouting
+# @name createMatch
+POST {{baseUrl}}/matches
+Content-Type: application/json
+
+{
+  "actor_id": "{{coachId}}",
+  "player_id": "{{playerId}}",
+  "opponent_name": "Dupla Exemplo Adversária",
+  "notes": "Quadra coberta - piso sintético rápido"
+}
+
+###
+
+@matchId = {{createMatch.response.body.id}}
+
+### 2. Consultar Detalhes da Partida
+GET {{baseUrl}}/matches/{{matchId}}?actor_id={{coachId}}
+Accept: application/json
+
+###
+
+### 3. Registrar Jogada 1: Víbora (Acertou + Decisão Boa padrão)
+# @name recordShot1
+POST {{baseUrl}}/matches/{{matchId}}/shots
+Content-Type: application/json
+
+{
+  "actor_id": "{{coachId}}",
+  "player_id": "{{playerId}}",
+  "set_number": 1,
+  "shot_type": "vibora",
+  "outcome": "hit"
+}
+
+###
+
+### 4. Registrar Jogada 2: Smash x3 (Acertou + Decisão Boa + Winner)
+# @name recordShot2
+POST {{baseUrl}}/matches/{{matchId}}/shots
+Content-Type: application/json
+
+{
+  "actor_id": "{{coachId}}",
+  "player_id": "{{playerId}}",
+  "set_number": 1,
+  "shot_type": "smash_x3",
+  "outcome": "hit",
+  "decision": "good",
+  "special_tag": "winner"
+}
+
+###
+
+### 5. Registrar Jogada 3: Bandeja (Errou + Decisão Ruim + Erro Não Forçado)
+# @name recordShot3
+POST {{baseUrl}}/matches/{{matchId}}/shots
+Content-Type: application/json
+
+{
+  "actor_id": "{{coachId}}",
+  "player_id": "{{playerId}}",
+  "set_number": 1,
+  "shot_type": "bandeja",
+  "outcome": "miss",
+  "decision": "bad",
+  "special_tag": "unforced_error"
+}
+
+###
+
+### 6. [Validação de Domínio] Winner com Resultado Miss (Deve retornar 422 WINNER_MUST_BE_HIT)
+POST {{baseUrl}}/matches/{{matchId}}/shots
+Content-Type: application/json
+
+{
+  "actor_id": "{{coachId}}",
+  "player_id": "{{playerId}}",
+  "set_number": 1,
+  "shot_type": "smash_potencia",
+  "outcome": "miss",
+  "decision": "good",
+  "special_tag": "winner"
+}
+
+###
+
+### 7. [Validação de Domínio] Erro Não Forçado com Resultado Hit (Deve retornar 422 UNFORCED_ERROR_MUST_BE_MISS)
+POST {{baseUrl}}/matches/{{matchId}}/shots
+Content-Type: application/json
+
+{
+  "actor_id": "{{coachId}}",
+  "player_id": "{{playerId}}",
+  "set_number": 1,
+  "shot_type": "chiquita",
+  "outcome": "hit",
+  "decision": "bad",
+  "special_tag": "unforced_error"
+}
+
+###
+
+### 8. [RBAC] Atleta tentando registrar jogada na própria partida (Deve retornar 403 Forbidden)
+POST {{baseUrl}}/matches/{{matchId}}/shots
+Content-Type: application/json
+
+{
+  "actor_id": "{{playerUserId}}",
+  "player_id": "{{playerId}}",
+  "set_number": 1,
+  "shot_type": "saque",
+  "outcome": "hit"
+}
+
+###
+
+### 9. Desfazer Última Jogada (Undo — remove a Jogada 3: Bandeja)
+# @name undoShot
+POST {{baseUrl}}/matches/{{matchId}}/shots/undo
+Content-Type: application/json
+
+{
+  "actor_id": "{{coachId}}"
+}
+
+###
+
+### 10. Listar Histórico de Jogadas da Partida (Consultado pelo próprio Atleta em modo Read-Only)
+GET {{baseUrl}}/matches/{{matchId}}/shots?actor_id={{playerUserId}}
+Accept: application/json

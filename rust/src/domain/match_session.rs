@@ -2,8 +2,9 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, toasty::Embed)]
 #[serde(rename_all = "snake_case")]
+#[column(type = enum("match_status_enum"))]
 pub enum MatchStatus {
     InProgress,
     Completed,
@@ -29,7 +30,7 @@ impl MatchSession {
     pub fn new(coach_id: Uuid, player_id: Uuid, opponent_name: Option<String>) -> Self {
         let now = Utc::now();
         Self {
-            id: Uuid::new_v4(),
+            id: Uuid::now_v7(),
             coach_id,
             player_id,
             tournament_id: None,

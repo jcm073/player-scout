@@ -13,6 +13,12 @@ pub enum AppError {
     #[error("Recurso não encontrado: {0}")]
     NotFound(String),
 
+    #[error("Acesso negado: {0}")]
+    Forbidden(String),
+
+    #[error("Conflito de recurso: {0}")]
+    Conflict(String),
+
     #[error("Requisição inválida: {0}")]
     BadRequest(String),
 
@@ -21,6 +27,16 @@ pub enum AppError {
 
     #[error("Erro interno no servidor: {0}")]
     Internal(String),
+}
+
+impl From<toasty::Error> for AppError {
+    fn from(err: toasty::Error) -> Self {
+        if err.is_record_not_found() {
+            AppError::NotFound(err.to_string())
+        } else {
+            AppError::Database(err.to_string())
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize)]
@@ -34,6 +50,8 @@ impl IntoResponse for AppError {
         let (status, code) = match &self {
             AppError::Domain(err) => (StatusCode::UNPROCESSABLE_ENTITY, err.code()),
             AppError::NotFound(_) => (StatusCode::NOT_FOUND, "NOT_FOUND"),
+            AppError::Forbidden(_) => (StatusCode::FORBIDDEN, "FORBIDDEN"),
+            AppError::Conflict(_) => (StatusCode::CONFLICT, "CONFLICT"),
             AppError::BadRequest(_) => (StatusCode::BAD_REQUEST, "BAD_REQUEST"),
             AppError::Database(_) => (StatusCode::INTERNAL_SERVER_ERROR, "DATABASE_ERROR"),
             AppError::Internal(_) => (StatusCode::INTERNAL_SERVER_ERROR, "INTERNAL_ERROR"),

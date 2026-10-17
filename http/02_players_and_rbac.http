@@ -1,0 +1,96 @@
+### ============================================================================
+### Player Scout API — 02. Jogadores, Multi-Coach (N:N) e Isolamento RBAC
+### Dica: Defina os IDs abaixo ou use o arquivo 99_full_e2e_workflow.http para
+### encadeamento automático de todas as variáveis.
+### ============================================================================
+
+@baseUrl = http://localhost:3000/api/v1
+
+# Substitua pelos UUIDs gerados no 01_users.http caso execute isoladamente:
+@coachTechId = 00000000-0000-0000-0000-000000000001
+@coachTacticalId = 00000000-0000-0000-0000-000000000002
+@playerUserId = 00000000-0000-0000-0000-000000000003
+
+### 1. Cadastrar Atleta 01 pelo Treinador Técnico (vinculado à conta de login Player)
+# @name createPlayer01
+POST {{baseUrl}}/players
+Content-Type: application/json
+
+{
+  "actor_id": "{{coachTechId}}",
+  "user_id": "{{playerUserId}}",
+  "name": "Atleta Exemplo 01",
+  "dominant_hand": "right_handed",
+  "preferred_side": "left",
+  "category": "1ª Categoria"
+}
+
+###
+
+### 2. Cadastrar Atleta 02 (Outro aluno do Treinador Técnico, sem vínculo com Atleta 01)
+# @name createPlayer02
+POST {{baseUrl}}/players
+Content-Type: application/json
+
+{
+  "actor_id": "{{coachTechId}}",
+  "user_id": null,
+  "name": "Atleta Exemplo 02",
+  "dominant_hand": "left_handed",
+  "preferred_side": "right",
+  "category": "2ª Categoria"
+}
+
+###
+
+### 3. [RBAC] Tentativa de Cadastro de Jogador por Perfil Player (Deve retornar 403 Forbidden)
+POST {{baseUrl}}/players
+Content-Type: application/json
+
+{
+  "actor_id": "{{playerUserId}}",
+  "user_id": null,
+  "name": "Cadastro Não Autorizado",
+  "dominant_hand": "right_handed",
+  "preferred_side": "both",
+  "category": "Iniciante"
+}
+
+###
+
+### 4. [Multi-Coach N:N] Vincular Segundo Treinador (Tático) ao Atleta 01
+@player01Id = {{createPlayer01.response.body.id}}
+
+POST {{baseUrl}}/players/{{player01Id}}/coaches
+Content-Type: application/json
+
+{
+  "actor_id": "{{coachTechId}}",
+  "coach_id": "{{coachTacticalId}}"
+}
+
+###
+
+### 5. Listar todos os Treinadores vinculados ao Atleta 01 (Consulta pelo próprio Atleta)
+GET {{baseUrl}}/players/{{player01Id}}/coaches?actor_id={{playerUserId}}
+Accept: application/json
+
+###
+
+### 6. Listar Jogadores visíveis para o Treinador Técnico (Vê Atleta 01 e Atleta 02)
+GET {{baseUrl}}/players?actor_id={{coachTechId}}
+Accept: application/json
+
+###
+
+### 7. [Isolamento RBAC] Listar Jogadores visíveis para o Atleta 01 (Vê APENAS a si mesmo)
+GET {{baseUrl}}/players?actor_id={{playerUserId}}
+Accept: application/json
+
+###
+
+### 8. [Isolamento RBAC] Atleta 01 tentando acessar ficha do Atleta 02 (Deve retornar 403 Forbidden)
+@player02Id = {{createPlayer02.response.body.id}}
+
+GET {{baseUrl}}/players/{{player02Id}}?actor_id={{playerUserId}}
+Accept: application/json

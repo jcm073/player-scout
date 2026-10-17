@@ -1,0 +1,18 @@
+### ============================================================================
+### Player Scout API — 00. Health Check
+### Compatível com a extensão REST Client (VS Code / Antigravity)
+### ============================================================================
+
+@baseUrl = http://localhost:3000
+
+### 1. Health Check Raiz (/health)
+# @name healthRoot
+GET {{baseUrl}}/health
+Accept: application/json
+
+###
+
+### 2. Health Check API v1 (/api/v1/health)
+# @name healthApiV1
+GET {{baseUrl}}/api/v1/health
+Accept: application/json

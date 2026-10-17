@@ -1,0 +1,75 @@
+### ============================================================================
+### Player Scout API — 01. Gestão de Usuários (Admin, Coach e Player Read-Only)
+### Execute as requisições em ordem para popular as variáveis @name automaticamente
+### ============================================================================
+
+@baseUrl = http://localhost:3000/api/v1
+
+### 1. Criar Usuário Administrador (Admin)
+# @name createAdmin
+POST {{baseUrl}}/users
+Content-Type: application/json
+
+{
+  "role": "admin",
+  "name": "Admin Sistema",
+  "email": "admin.sistema@playerscout.example",
+  "password_hash": "hash_exemplo_nao_real_admin"
+}
+
+###
+
+### 2. Criar Treinador 1 — Técnico de Padel (Coach)
+# @name createCoachTech
+POST {{baseUrl}}/users
+Content-Type: application/json
+
+{
+  "role": "coach",
+  "name": "Treinador Técnico A",
+  "email": "coach.tecnico@playerscout.example",
+  "password_hash": "hash_exemplo_nao_real_coach_1"
+}
+
+###
+
+### 3. Criar Treinador 2 — Preparador Tático (Coach)
+# @name createCoachTactical
+POST {{baseUrl}}/users
+Content-Type: application/json
+
+{
+  "role": "coach",
+  "name": "Treinador Tático B",
+  "email": "coach.tatico@playerscout.example",
+  "password_hash": "hash_exemplo_nao_real_coach_2"
+}
+
+###
+
+### 4. Criar Conta de Usuário para Atleta (Perfil Player — Somente Leitura)
+# @name createPlayerUser
+POST {{baseUrl}}/users
+Content-Type: application/json
+
+{
+  "role": "player",
+  "name": "Atleta Exemplo 01",
+  "email": "atleta.01@playerscout.example",
+  "password_hash": "hash_exemplo_nao_real_player"
+}
+
+###
+
+### 5. Listar Todos os Usuários Cadastrados
+# @name listUsers
+GET {{baseUrl}}/users
+Accept: application/json
+
+###
+
+### 6. Buscar Usuário por ID (usando o ID retornado em createCoachTech)
+@coachTechId = {{createCoachTech.response.body.id}}
+
+GET {{baseUrl}}/users/{{coachTechId}}
+Accept: application/json
