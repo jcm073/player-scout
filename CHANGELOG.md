@@ -88,6 +88,14 @@ O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.
     - `GET /api/v1/analytics/players/{id}` (agregação recursiva com verificação de permissão RBAC).
     - `POST /api/v1/analytics/compare` (comparação pareada de dois escopos).
   - Scripts REST Client atualizados (`http/04_analytics_and_compare.http` e passos 14 a 16 em `http/99_full_e2e_workflow.http`) e 12 testes automatizados (unitários + integração) com 100% de aprovação.
-
-
-
+- **Frontend Web SSR com Askama, HTMX, Chart.js 4.4.9 & Tela Touch-First de Quadra (Conclusão da Fase 4):**
+  - **Auditoria de Segurança de Dependência Web:** Verificação explícita da versão **Chart.js `4.4.9`** sem CVEs conhecidos (CVE-2020-7746 restrito a `< 2.9.4`).
+  - **Templates Server-Side Compilados (`askama = "0.16.1"` em `rust/templates/`):**
+    - `dashboard.html` e `partials/analytics_panel.html`: Dashboard Analítico Responsivo e Recursivo com 4 cards de KPIs, Matriz Tática de 4 Quadrantes (*Decisão × Execução*), Gráfico Radar de 6 Fases do Padel renderizado via Chart.js `4.4.9`, eficiência por zona e tabela detalhada por golpe.
+    - `partials/compare_panel.html`: Modo Comparativo Lado a Lado (`Set 1 vs Set 2`) com cartões de deltas (▲/▼) e barras pareadas de aproveitamento por golpe.
+    - `court.html` e `partials/court_feed.html`: Interface Touch-First do Treinador em Quadra para celular e tablet, sem atalhos de teclado, com catálogo dos 21 golpes do Padel agrupados nas 3 zonas táticas (`min-h-[48px]`), botões gigantes `ACERTOU (IN)` e `ERROU (OUT)` fixos na *Thumb Zone* (`min-h-[64px]`), botão de *Desfazer (Undo)* visível no topo, feedback tátil via `navigator.vibrate` e auto-vínculo de `Erro Não Forçado (ENF)` para `Miss`.
+  - **Handlers Web & Rotas HTMX (`rust/src/api/web.rs`):**
+    - `GET /` e `GET /web/dashboard`, `GET /web/court`, `GET /web/partials/analytics`, `GET /web/partials/compare`, `POST /web/partials/court/shot` e `POST /web/partials/court/undo`.
+  - **Testes Automatizados de Contrato Web em Rust & REST Client:**
+    - Novo teste fim a fim `test_web_askama_htmx_dashboard_and_touch_first_court_flow` em `rust/tests/api_integration_tests.rs` validando SSR Askama, Chart.js `4.4.9`, ergonomia Touch-First, fragmentos HTMX, auto-vínculo ENF→Miss, Undo e bloqueio RBAC (`403 Forbidden` para `Player` Read-Only).
+    - Script interativo `http/05_web_htmx.http` adicionado à coleção do plugin REST Client.

@@ -39,6 +39,12 @@ impl From<toasty::Error> for AppError {
     }
 }
 
+impl From<askama::Error> for AppError {
+    fn from(err: askama::Error) -> Self {
+        AppError::Internal(format!("Erro ao renderizar template Askama: {err}"))
+    }
+}
+
 #[derive(Serialize, Deserialize)]
 pub struct ErrorResponse {
     pub error: String,

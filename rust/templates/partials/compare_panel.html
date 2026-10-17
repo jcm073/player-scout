@@ -1,0 +1,83 @@
+<div id="compare-panel-content" class="space-y-6">
+  <div class="bg-slate-800/80 border border-slate-700 rounded-xl p-5">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
+      <div>
+        <h3 class="text-base font-bold text-white">Modo Comparativo Lado a Lado ({{ label_a }} vs {{ label_b }})</h3>
+        <p class="text-xs text-slate-400">Variação direta de eficiência técnica e maturidade tática (Δ = {{ label_b }} − {{ label_a }})</p>
+      </div>
+      <span class="text-xs px-3 py-1 rounded-full bg-indigo-900/70 text-indigo-200 font-semibold">Comparação Recursiva</span>
+    </div>
+
+    <!-- Cartões de Deltas Principais -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <!-- Delta Acerto -->
+      <div class="p-4 rounded-xl bg-slate-900/80 border border-slate-700">
+        <div class="text-xs uppercase font-semibold text-slate-400">Evolução Taxa de Acerto</div>
+        <div class="mt-2 flex items-baseline justify-between">
+          <div class="text-sm text-slate-300">
+            {{ comparison.scope_a.hit_rate_pct }}% <span class="text-slate-500">→</span> <strong class="text-white">{{ comparison.scope_b.hit_rate_pct }}%</strong>
+          </div>
+          <span class="text-lg font-extrabold {% if comparison.deltas.hit_rate_delta_pct >= 0.0 %}text-emerald-400{% else %}text-rose-400{% endif %}">
+            {% if comparison.deltas.hit_rate_delta_pct >= 0.0 %}▲ +{% else %}▼ {% endif %}{{ comparison.deltas.hit_rate_delta_pct }}%
+          </span>
+        </div>
+      </div>
+
+      <!-- Delta Decisão Boa -->
+      <div class="p-4 rounded-xl bg-slate-900/80 border border-slate-700">
+        <div class="text-xs uppercase font-semibold text-slate-400">Evolução Decisão Tática</div>
+        <div class="mt-2 flex items-baseline justify-between">
+          <div class="text-sm text-slate-300">
+            {{ comparison.scope_a.good_decision_rate_pct }}% <span class="text-slate-500">→</span> <strong class="text-white">{{ comparison.scope_b.good_decision_rate_pct }}%</strong>
+          </div>
+          <span class="text-lg font-extrabold {% if comparison.deltas.good_decision_rate_delta_pct >= 0.0 %}text-sky-400{% else %}text-rose-400{% endif %}">
+            {% if comparison.deltas.good_decision_rate_delta_pct >= 0.0 %}▲ +{% else %}▼ {% endif %}{{ comparison.deltas.good_decision_rate_delta_pct }}%
+          </span>
+        </div>
+      </div>
+
+      <!-- Delta Saldo W/UE -->
+      <div class="p-4 rounded-xl bg-slate-900/80 border border-slate-700">
+        <div class="text-xs uppercase font-semibold text-slate-400">Delta Saldo Winner / ENF</div>
+        <div class="mt-2 flex items-baseline justify-between">
+          <div class="text-sm text-slate-300">
+            {{ comparison.scope_a.winner_to_ue_balance }} <span class="text-slate-500">→</span> <strong class="text-white">{{ comparison.scope_b.winner_to_ue_balance }}</strong>
+          </div>
+          <span class="text-lg font-extrabold {% if comparison.deltas.winner_to_ue_balance_delta >= 0 %}text-emerald-400{% else %}text-rose-400{% endif %}">
+            {% if comparison.deltas.winner_to_ue_balance_delta >= 0 %}▲ +{% else %}▼ {% endif %}{{ comparison.deltas.winner_to_ue_balance_delta }}
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Comparativo Pareado por Golpe -->
+    <div class="mt-6">
+      <h4 class="text-sm font-semibold text-slate-200 mb-3">Barras Pareadas de Aproveitamento por Golpe</h4>
+      {% if comparison.deltas.by_shot_type_deltas.is_empty() %}
+        <p class="text-sm text-slate-400">Sem golpes registrados nos escopos selecionados.</p>
+      {% else %}
+        <div class="space-y-3">
+          {% for delta in comparison.deltas.by_shot_type_deltas %}
+          <div class="p-3 rounded-lg bg-slate-900/60 border border-slate-700/70">
+            <div class="flex items-center justify-between text-xs font-semibold mb-1.5">
+              <span class="text-white">{{ delta.shot_type.label_pt() }}</span>
+              <span class="{% if delta.hit_rate_delta_pct >= 0.0 %}text-emerald-400{% else %}text-rose-400{% endif %}">
+                {{ label_a }}: {{ delta.hit_rate_a_pct }}% ({{ delta.total_a }}) | {{ label_b }}: {{ delta.hit_rate_b_pct }}% ({{ delta.total_b }})
+                → {% if delta.hit_rate_delta_pct >= 0.0 %}+{% endif %}{{ delta.hit_rate_delta_pct }}%
+              </span>
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+              <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+                <div class="bg-slate-400 h-full" style="width: {{ delta.hit_rate_a_pct }}%"></div>
+              </div>
+              <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+                <div class="bg-emerald-500 h-full" style="width: {{ delta.hit_rate_b_pct }}%"></div>
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>

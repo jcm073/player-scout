@@ -1,0 +1,38 @@
+@baseUrl = http://localhost:3000
+
+# Substitua pelos UUIDs gerados nos scripts anteriores ou use o 99_full_e2e_workflow.http
+@coachId = 00000000-0000-0000-0000-000000000000
+@playerId = 00000000-0000-0000-0000-000000000000
+@matchId = 00000000-0000-0000-0000-000000000000
+
+### 1. Dashboard Analítico Web (Modo Demonstração inicial sem parâmetros)
+GET {{baseUrl}}/
+Accept: text/html
+
+### 2. Dashboard Analítico Web Autenticado (Atleta + Partida + Comparativo Set 1 vs Set 2)
+GET {{baseUrl}}/web/dashboard?actor_id={{coachId}}&player_id={{playerId}}&match_id={{matchId}}
+Accept: text/html
+
+### 3. Tela Touch-First de Quadra do Treinador (21 Golpes do Padel + Thumb Zone + Undo)
+GET {{baseUrl}}/web/court?actor_id={{coachId}}&player_id={{playerId}}&match_id={{matchId}}
+Accept: text/html
+
+### 4. Parcial HTMX: Drill-Down Recursivo do Painel Analítico (Ex.: Set 1)
+GET {{baseUrl}}/web/partials/analytics?actor_id={{coachId}}&player_id={{playerId}}&match_id={{matchId}}&set_number=1
+Accept: text/html
+
+### 5. Parcial HTMX: Modo Comparativo Lado a Lado (Set 1 vs Set 2)
+GET {{baseUrl}}/web/partials/compare?actor_id={{coachId}}&player_id={{playerId}}&match_id={{matchId}}&set_a=1&set_b=2
+Accept: text/html
+
+### 6. Parcial HTMX: Registrar Golpe em Quadra (Formulário Touch-First)
+POST {{baseUrl}}/web/partials/court/shot
+Content-Type: application/x-www-form-urlencoded
+
+actor_id={{coachId}}&player_id={{playerId}}&match_id={{matchId}}&set_number=1&shot_type=vibora&outcome=hit&decision=good&special_tag=winner
+
+### 7. Parcial HTMX: Desfazer Última Jogada em Quadra (Undo)
+POST {{baseUrl}}/web/partials/court/undo
+Content-Type: application/x-www-form-urlencoded
+
+actor_id={{coachId}}&match_id={{matchId}}

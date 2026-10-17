@@ -71,6 +71,47 @@ async fn send_json<T: serde::Serialize, R: DeserializeOwned>(
     (status, parsed)
 }
 
+async fn send_get_html(app: &axum::Router, uri: &str) -> (StatusCode, String) {
+    let req = Request::builder()
+        .method(Method::GET)
+        .uri(uri)
+        .body(Body::empty())
+        .expect("Falha ao construir requisição GET HTML");
+
+    let res = app
+        .clone()
+        .oneshot(req)
+        .await
+        .expect("Falha ao executar requisição GET HTML");
+
+    let status = res.status();
+    let bytes = to_bytes(res.into_body(), 1024 * 1024)
+        .await
+        .expect("Falha ao ler corpo HTML");
+    (status, String::from_utf8_lossy(&bytes).into_owned())
+}
+
+async fn send_form_html(app: &axum::Router, uri: &str, form_body: &str) -> (StatusCode, String) {
+    let req = Request::builder()
+        .method(Method::POST)
+        .uri(uri)
+        .header("content-type", "application/x-www-form-urlencoded")
+        .body(Body::from(form_body.to_owned()))
+        .expect("Falha ao construir requisição POST Form");
+
+    let res = app
+        .clone()
+        .oneshot(req)
+        .await
+        .expect("Falha ao executar requisição POST Form");
+
+    let status = res.status();
+    let bytes = to_bytes(res.into_body(), 1024 * 1024)
+        .await
+        .expect("Falha ao ler corpo da resposta Form");
+    (status, String::from_utf8_lossy(&bytes).into_owned())
+}
+
 #[tokio::test]
 async fn test_end_to_end_toasty_persistence_rbac_and_shot_undo() {
     let app = setup_test_app().await;
@@ -457,4 +498,185 @@ async fn test_end_to_end_toasty_persistence_rbac_and_shot_undo() {
     assert_eq!(comparison.scope_b.hit_rate_pct, 100.0);
     assert_eq!(comparison.deltas.hit_rate_delta_pct, 33.33);
     assert_eq!(comparison.deltas.good_decision_rate_delta_pct, 33.33);
+}
+
+#[tokio::test]
+async fn test_web_askama_htmx_dashboard_and_touch_first_court_flow() {
+    let app = setup_test_app().await;
+    let unique_tag = Uuid::now_v7();
+
+    // 1. Verifica renderização inicial do Dashboard sem query params (Modo Demonstração)
+    let (status, demo_html) = send_get_html(&app, "/").await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(demo_html.contains("Player Scout"));
+    assert!(demo_html.contains("chart.js@4.4.9"));
+    assert!(demo_html.contains("Matriz Tática: Decisão × Execução"));
+    assert!(demo_html.contains("padelRadarChart"));
+
+    // 2. Cria Treinador, Atleta e Partida para validar fluxo completo HTMX
+    let (status, coach): (StatusCode, User) = send_json(
+        &app,
+        Method::POST,
+        "/api/v1/users",
+        Some(&CreateUserRequest {
+            role: UserRole::Coach,
+            name: "Coach Web HTMX".to_string(),
+            email: format!("coach.web.{unique_tag}@playerscout.test"),
+            password_hash: "argon2_hash_placeholder".to_string(),
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED);
+
+    let (status, athlete_user): (StatusCode, User) = send_json(
+        &app,
+        Method::POST,
+        "/api/v1/users",
+        Some(&CreateUserRequest {
+            role: UserRole::Player,
+            name: "Sofia Padel Pro".to_string(),
+            email: format!("sofia.web.{unique_tag}@playerscout.test"),
+            password_hash: "argon2_hash_placeholder".to_string(),
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED);
+
+    let (status, player): (StatusCode, Player) = send_json(
+        &app,
+        Method::POST,
+        "/api/v1/players",
+        Some(&CreatePlayerRequest {
+            actor_id: coach.id,
+            user_id: Some(athlete_user.id),
+            name: "Sofia Padel Pro".to_string(),
+            dominant_hand: DominantHand::RightHanded,
+            preferred_side: PreferredSide::Right,
+            category: Some("1ª Categoria".to_string()),
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED);
+
+    let (status, match_session): (StatusCode, MatchSession) = send_json(
+        &app,
+        Method::POST,
+        "/api/v1/matches",
+        Some(&CreateMatchRequest {
+            actor_id: coach.id,
+            player_id: player.id,
+            opponent_name: Some("Dupla Rival Final".to_string()),
+            notes: Some("Quadra Central Panorâmica".to_string()),
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED);
+
+    // 3. Verifica Tela Touch-First de Quadra (`GET /web/court`)
+    let (status, court_html) = send_get_html(
+        &app,
+        &format!(
+            "/web/court?actor_id={}&player_id={}&match_id={}",
+            coach.id, player.id, match_session.id
+        ),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(court_html.contains("Sofia Padel Pro"));
+    assert!(court_html.contains("ACERTOU (IN)"));
+    assert!(court_html.contains("ERROU (OUT)"));
+    assert!(court_html.contains("Desfazer (Undo)"));
+    assert!(court_html.contains("navigator.vibrate"));
+    assert!(court_html.contains("min-h-[48px]"));
+    assert!(court_html.contains("min-h-[64px]"));
+    // Confere presença das 3 zonas táticas e golpes do catálogo de Padel
+    assert!(court_html.contains("Início de Ponto"));
+    assert!(court_html.contains("Rede &amp; Ataque") || court_html.contains("Rede & Ataque"));
+    assert!(court_html.contains("Fundo &amp; Vidros") || court_html.contains("Fundo & Vidros"));
+    assert!(court_html.contains("Víbora"));
+    assert!(court_html.contains("Bajada de Parede"));
+
+    // 4. Registro de Golpe via HTMX Form (`POST /web/partials/court/shot`) — Winner no Set 1
+    let form_shot_1 = format!(
+        "actor_id={}&player_id={}&match_id={}&set_number=1&shot_type=vibora&outcome=hit&decision=good&special_tag=winner",
+        coach.id, player.id, match_session.id
+    );
+    let (status, feed_html_1) =
+        send_form_html(&app, "/web/partials/court/shot", &form_shot_1).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(feed_html_1.contains("Golpe registrado: Víbora (ACERTOU) — Set 1"));
+    assert!(feed_html_1.contains("100%"));
+
+    // 5. Testa regra de ergonomia Touch-First: marcar `unforced_error` força automaticamente `Miss`
+    let form_shot_2 = format!(
+        "actor_id={}&player_id={}&match_id={}&set_number=1&shot_type=bandeja&outcome=hit&decision=bad&special_tag=unforced_error",
+        coach.id, player.id, match_session.id
+    );
+    let (status, feed_html_2) =
+        send_form_html(&app, "/web/partials/court/shot", &form_shot_2).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(feed_html_2.contains("Golpe registrado: Bandeja (ERROU) — Set 1"));
+    assert!(feed_html_2.contains("50%"));
+
+    // 6. RBAC na rota HTMX: Jogador (`Player` Read-Only) não pode registrar golpe nem desfazer
+    let forbidden_form = format!(
+        "actor_id={}&player_id={}&match_id={}&set_number=1&shot_type=saque&outcome=hit&decision=good&special_tag=",
+        athlete_user.id, player.id, match_session.id
+    );
+    let (status, _) = send_form_html(&app, "/web/partials/court/shot", &forbidden_form).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+
+    // 7. Desfazer Última Jogada via HTMX (`POST /web/partials/court/undo`)
+    let undo_form = format!("actor_id={}&match_id={}", coach.id, match_session.id);
+    let (status, feed_undo_html) =
+        send_form_html(&app, "/web/partials/court/undo", &undo_form).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(feed_undo_html.contains("Jogada desfeita: Bandeja (Set 1)"));
+    assert!(feed_undo_html.contains("100%"));
+
+    // 8. Registra golpe no Set 2 e valida parciais HTMX do Dashboard (`analytics` e `compare`)
+    let form_shot_set2 = format!(
+        "actor_id={}&player_id={}&match_id={}&set_number=2&shot_type=smash_x3&outcome=hit&decision=good&special_tag=winner",
+        coach.id, player.id, match_session.id
+    );
+    let (status, _) = send_form_html(&app, "/web/partials/court/shot", &form_shot_set2).await;
+    assert_eq!(status, StatusCode::OK);
+
+    let (status, partial_analytics) = send_get_html(
+        &app,
+        &format!(
+            "/web/partials/analytics?actor_id={}&player_id={}&match_id={}",
+            athlete_user.id, player.id, match_session.id
+        ),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(partial_analytics.contains("id=\"analytics-panel-content\""));
+    assert!(partial_analytics.contains("Smash x3"));
+    assert!(partial_analytics.contains("Víbora"));
+
+    let (status, partial_compare) = send_get_html(
+        &app,
+        &format!(
+            "/web/partials/compare?actor_id={}&player_id={}&match_id={}&set_a=1&set_b=2",
+            athlete_user.id, player.id, match_session.id
+        ),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(partial_compare.contains("id=\"compare-panel-content\""));
+    assert!(partial_compare.contains("Modo Comparativo Lado a Lado (Set 1 vs Set 2)"));
+
+    // 9. Dashboard completo autenticado (`GET /web/dashboard`)
+    let (status, full_dashboard) = send_get_html(
+        &app,
+        &format!(
+            "/web/dashboard?actor_id={}&player_id={}&match_id={}",
+            athlete_user.id, player.id, match_session.id
+        ),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(full_dashboard.contains("Sofia Padel Pro"));
+    assert!(full_dashboard.contains("Modo Comparativo Lado a Lado (Set 1 vs Set 2)"));
 }

@@ -74,6 +74,91 @@ impl ShotType {
     pub fn is_serve_or_return(&self) -> bool {
         matches!(self, ShotType::Saque | ShotType::Recepcao)
     }
+
+    pub fn label_pt(&self) -> &'static str {
+        match self {
+            ShotType::Saque => "Saque",
+            ShotType::Recepcao => "Recepção",
+            ShotType::VoleioDireita => "Voleio Direita",
+            ShotType::VoleioEsquerda => "Voleio Esquerda",
+            ShotType::Bandeja => "Bandeja",
+            ShotType::Vibora => "Víbora",
+            ShotType::SmashPotencia => "Smash Trazer",
+            ShotType::SmashX3 => "Smash x3",
+            ShotType::SmashX4 => "Smash x4",
+            ShotType::Rulo => "Rulo na Grade",
+            ShotType::Deixadinha => "Deixadinha",
+            ShotType::Bloqueio => "Bloqueio",
+            ShotType::BatidaDireita => "Batida Direita",
+            ShotType::BatidaEsquerda => "Batida Esquerda",
+            ShotType::GloboDireita => "Globo Direita",
+            ShotType::GloboEsquerda => "Globo Esquerda",
+            ShotType::Chiquita => "Chiquita",
+            ShotType::SaidaParedeDireita => "Saída Parede Dir.",
+            ShotType::SaidaParedeEsquerda => "Saída Parede Esq.",
+            ShotType::BajadaParede => "Bajada de Parede",
+            ShotType::ContraParede => "Contra-parede",
+        }
+    }
+
+    pub fn slug(&self) -> &'static str {
+        match self {
+            ShotType::Saque => "saque",
+            ShotType::Recepcao => "recepcao",
+            ShotType::VoleioDireita => "voleio_direita",
+            ShotType::VoleioEsquerda => "voleio_esquerda",
+            ShotType::Bandeja => "bandeja",
+            ShotType::Vibora => "vibora",
+            ShotType::SmashPotencia => "smash_potencia",
+            ShotType::SmashX3 => "smash_x3",
+            ShotType::SmashX4 => "smash_x4",
+            ShotType::Rulo => "rulo",
+            ShotType::Deixadinha => "deixadinha",
+            ShotType::Bloqueio => "bloqueio",
+            ShotType::BatidaDireita => "batida_direita",
+            ShotType::BatidaEsquerda => "batida_esquerda",
+            ShotType::GloboDireita => "globo_direita",
+            ShotType::GloboEsquerda => "globo_esquerda",
+            ShotType::Chiquita => "chiquita",
+            ShotType::SaidaParedeDireita => "saida_parede_direita",
+            ShotType::SaidaParedeEsquerda => "saida_parede_esquerda",
+            ShotType::BajadaParede => "bajada_parede",
+            ShotType::ContraParede => "contra_parede",
+        }
+    }
+
+    pub const fn serve_shots() -> &'static [ShotType] {
+        &[ShotType::Saque, ShotType::Recepcao]
+    }
+
+    pub const fn net_shots() -> &'static [ShotType] {
+        &[
+            ShotType::VoleioDireita,
+            ShotType::VoleioEsquerda,
+            ShotType::Bandeja,
+            ShotType::Vibora,
+            ShotType::SmashPotencia,
+            ShotType::SmashX3,
+            ShotType::SmashX4,
+            ShotType::Rulo,
+            ShotType::Deixadinha,
+            ShotType::Bloqueio,
+        ]
+    }
+
+    pub const fn backcourt_shots() -> &'static [ShotType] {
+        &[
+            ShotType::BatidaDireita,
+            ShotType::BatidaEsquerda,
+            ShotType::GloboDireita,
+            ShotType::GloboEsquerda,
+            ShotType::Chiquita,
+            ShotType::SaidaParedeDireita,
+            ShotType::SaidaParedeEsquerda,
+            ShotType::BajadaParede,
+            ShotType::ContraParede,
+        ]
+    }
 }
 
 /// Resultado obrigatório da execução do golpe

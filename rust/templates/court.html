@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Player Scout — Registro Touch-First em Quadra</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- HTMX para envio instantâneo sem recarregar a tela -->
+  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen pb-44 select-none font-sans antialiased">
+  <!-- Topbar Compacta de Quadra -->
+  <header class="border-b border-slate-800 bg-slate-900 px-4 py-3 sticky top-0 z-30 flex items-center justify-between">
+    <div>
+      <div class="text-xs font-bold uppercase text-emerald-400">Scouting em Quadra · Touch-First</div>
+      <h1 class="text-base font-extrabold text-white">{{ player_name }}</h1>
+    </div>
+
+    <div class="flex items-center gap-2">
+      <!-- Botão Visível de Undo (Desfazer Última Jogada) -->
+      <button
+        type="button"
+        hx-post="/web/partials/court/undo"
+        hx-vals='{"actor_id": "{{ actor_id }}", "match_id": "{{ match_id }}"}'
+        hx-target="#court-feed"
+        hx-swap="innerHTML"
+        onclick="if (navigator.vibrate) navigator.vibrate(30);"
+        class="min-h-[48px] px-4 py-2 rounded-xl bg-amber-600/20 border border-amber-500/60 text-amber-300 font-bold text-xs flex items-center gap-1.5 active:scale-95 transition"
+      >
+        ↩️ Desfazer (Undo)
+      </button>
+
+      <a
+        href="/?actor_id={{ actor_id }}&player_id={{ player_id }}&match_id={{ match_id }}"
+        class="min-h-[48px] px-3.5 py-2 rounded-xl bg-slate-800 border border-slate-700 text-slate-200 font-bold text-xs flex items-center"
+      >
+        📊 Dashboard
+      </a>
+    </div>
+  </header>
+
+  <main class="max-w-2xl mx-auto px-3 py-4 space-y-4">
+    <!-- Formulário de Estado Tático (Sincronizado com os botões da Thumb Zone) -->
+    <form id="court-shot-form" class="space-y-4">
+      <input type="hidden" name="actor_id" value="{{ actor_id }}" />
+      <input type="hidden" name="player_id" value="{{ player_id }}" />
+      <input type="hidden" name="match_id" value="{{ match_id }}" />
+      <input type="hidden" id="selected-shot-type" name="shot_type" value="saque" />
+      <input type="hidden" id="selected-decision" name="decision" value="good" />
+      <input type="hidden" id="selected-special-tag" name="special_tag" value="" />
+
+      <!-- Seletor de Set (Alvos >= 48px) -->
+      <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 flex items-center justify-between">
+        <span class="text-xs font-bold uppercase text-slate-400">Set Atual:</span>
+        <div class="flex gap-2">
+          {% for s in 1..=3 %}
+          <label class="cursor-pointer">
+            <input type="radio" name="set_number" value="{{ s }}" {% if s == 1 %}checked{% endif %} class="peer sr-only" />
+            <span class="min-h-[48px] min-w-[52px] px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 peer-checked:bg-emerald-600 peer-checked:border-emerald-400 peer-checked:text-white text-slate-300 font-bold text-sm flex items-center justify-center">
+              Set {{ s }}
+            </span>
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- Catálogo dos 21 Golpes do Padel (Alvos Touch >= 48px, Sem Atalhos de Teclado) -->
+      <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 space-y-3">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-bold uppercase text-slate-400">1. Golpe Executado (21 Golpes do Padel)</span>
+          <span id="active-shot-label" class="text-xs font-extrabold text-emerald-400">Selecionado: Saque</span>
+        </div>
+
+        <!-- Zona 1: Início de Ponto -->
+        <div>
+          <div class="text-[11px] font-semibold uppercase text-slate-400 mb-1.5">Início de Ponto</div>
+          <div class="grid grid-cols-2 gap-2">
+            {% for shot in serve_shots %}
+            <button
+              type="button"
+              data-shot-slug="{{ shot.slug() }}"
+              data-shot-label="{{ shot.label_pt() }}"
+              onclick="selectShot(this)"
+              class="shot-btn min-h-[48px] px-3 py-2.5 rounded-xl border text-xs font-bold text-left transition active:scale-95 {% if shot.slug() == "saque" %}bg-emerald-600/30 border-emerald-400 text-white{% else %}bg-slate-800 border-slate-700 text-slate-200{% endif %}"
+            >
+              {{ shot.label_pt() }}
+            </button>
+            {% endfor %}
+          </div>
+        </div>
+
+        <!-- Zona 2: Rede & Ataque -->
+        <div>
+          <div class="text-[11px] font-semibold uppercase text-slate-400 mb-1.5">Rede & Ataque</div>
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            {% for shot in net_shots %}
+            <button
+              type="button"
+              data-shot-slug="{{ shot.slug() }}"
+              data-shot-label="{{ shot.label_pt() }}"
+              onclick="selectShot(this)"
+              class="shot-btn min-h-[48px] px-3 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-slate-200 text-xs font-bold text-left transition active:scale-95"
+            >
+              {{ shot.label_pt() }}
+            </button>
+            {% endfor %}
+          </div>
+        </div>
+
+        <!-- Zona 3: Fundo & Vidros -->
+        <div>
+          <div class="text-[11px] font-semibold uppercase text-slate-400 mb-1.5">Fundo & Vidros</div>
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            {% for shot in backcourt_shots %}
+            <button
+              type="button"
+              data-shot-slug="{{ shot.slug() }}"
+              data-shot-label="{{ shot.label_pt() }}"
+              onclick="selectShot(this)"
+              class="shot-btn min-h-[48px] px-3 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-slate-200 text-xs font-bold text-left transition active:scale-95"
+            >
+              {{ shot.label_pt() }}
+            </button>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+
+      <!-- Qualidade de Decisão (Padrão: Boa) e Marcadores Especiais (Winner / ENF) -->
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+        <button
+          type="button"
+          id="toggle-bad-decision"
+          onclick="toggleBadDecision()"
+          class="min-h-[52px] px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-slate-200 font-bold text-xs flex items-center justify-between active:scale-95 transition"
+        >
+          <span>🧠 Decisão Tática:</span>
+          <span id="decision-badge" class="px-2 py-0.5 rounded bg-emerald-900/80 text-emerald-300">BOA (Padrão)</span>
+        </button>
+
+        <button
+          type="button"
+          id="toggle-winner-tag"
+          onclick="selectSpecialTag('winner')"
+          class="min-h-[52px] px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-amber-300 font-bold text-xs flex items-center justify-center gap-1.5 active:scale-95 transition"
+        >
+          ⭐ Marcar Winner
+        </button>
+
+        <button
+          type="button"
+          id="toggle-enf-tag"
+          onclick="selectSpecialTag('unforced_error')"
+          class="min-h-[52px] px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-rose-300 font-bold text-xs flex items-center justify-center gap-1.5 active:scale-95 transition"
+        >
+          ⚠️ Erro Não Forçado (ENF)
+        </button>
+      </div>
+    </form>
+
+    <!-- Feed Ao Vivo da Partida (Atualizado via HTMX) -->
+    <section id="court-feed">
+      {{ feed_html|safe }}
+    </section>
+  </main>
+
+  <!-- THUMB ZONE FIXA NA BASE (Botões Gigantes ACERTOU / ERROU para Polegar em Celular/Tablet) -->
+  <footer class="fixed bottom-0 inset-x-0 z-40 bg-slate-900/95 backdrop-blur border-t border-slate-800 p-3">
+    <div class="max-w-2xl mx-auto grid grid-cols-2 gap-3">
+      <button
+        type="button"
+        hx-post="/web/partials/court/shot"
+        hx-include="#court-shot-form"
+        hx-vals='{"outcome": "hit"}'
+        hx-target="#court-feed"
+        hx-swap="innerHTML"
+        onclick="onThumbAction()"
+        class="min-h-[64px] rounded-2xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-black text-lg tracking-wide shadow-lg shadow-emerald-950/60 flex items-center justify-center gap-2 transition"
+      >
+        ✅ ACERTOU (IN)
+      </button>
+
+      <button
+        type="button"
+        hx-post="/web/partials/court/shot"
+        hx-include="#court-shot-form"
+        hx-vals='{"outcome": "miss"}'
+        hx-target="#court-feed"
+        hx-swap="innerHTML"
+        onclick="onThumbAction()"
+        class="min-h-[64px] rounded-2xl bg-rose-600 hover:bg-rose-500 active:scale-95 text-white font-black text-lg tracking-wide shadow-lg shadow-rose-950/60 flex items-center justify-center gap-2 transition"
+      >
+        ❌ ERROU (OUT)
+      </button>
+    </div>
+  </footer>
+
+  <script>
+    function selectShot(btn) {
+      document.getElementById('selected-shot-type').value = btn.dataset.shotSlug;
+      document.getElementById('active-shot-label').textContent = 'Selecionado: ' + btn.dataset.shotLabel;
+      document.querySelectorAll('.shot-btn').forEach(el => {
+        el.className = 'shot-btn min-h-[48px] px-3 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-slate-200 text-xs font-bold text-left transition active:scale-95';
+      });
+      btn.className = 'shot-btn min-h-[48px] px-3 py-2.5 rounded-xl bg-emerald-600/30 border border-emerald-400 text-white text-xs font-bold text-left transition active:scale-95';
+      if (navigator.vibrate) navigator.vibrate(20);
+    }
+
+    function toggleBadDecision() {
+      const input = document.getElementById('selected-decision');
+      const badge = document.getElementById('decision-badge');
+      if (input.value === 'good') {
+        input.value = 'bad';
+        badge.textContent = 'RUIM (Tática)';
+        badge.className = 'px-2 py-0.5 rounded bg-amber-900/90 text-amber-200';
+      } else {
+        input.value = 'good';
+        badge.textContent = 'BOA (Padrão)';
+        badge.className = 'px-2 py-0.5 rounded bg-emerald-900/80 text-emerald-300';
+      }
+      if (navigator.vibrate) navigator.vibrate(25);
+    }
+
+    function selectSpecialTag(tag) {
+      const input = document.getElementById('selected-special-tag');
+      const winnerBtn = document.getElementById('toggle-winner-tag');
+      const enfBtn = document.getElementById('toggle-enf-tag');
+
+      if (input.value === tag) {
+        input.value = '';
+      } else {
+        input.value = tag;
+      }
+
+      winnerBtn.classList.toggle('border-amber-400', input.value === 'winner');
+      winnerBtn.classList.toggle('bg-amber-950/60', input.value === 'winner');
+      enfBtn.classList.toggle('border-rose-400', input.value === 'unforced_error');
+      enfBtn.classList.toggle('bg-rose-950/60', input.value === 'unforced_error');
+      if (navigator.vibrate) navigator.vibrate(25);
+    }
+
+    function onThumbAction() {
+      if (navigator.vibrate) navigator.vibrate(40);
+      // Reseta Decisão para Boa (padrão) e limpa tag especial após o registro
+      setTimeout(() => {
+        document.getElementById('selected-decision').value = 'good';
+        const badge = document.getElementById('decision-badge');
+        badge.textContent = 'BOA (Padrão)';
+        badge.className = 'px-2 py-0.5 rounded bg-emerald-900/80 text-emerald-300';
+        document.getElementById('selected-special-tag').value = '';
+        document.getElementById('toggle-winner-tag').classList.remove('border-amber-400', 'bg-amber-950/60');
+        document.getElementById('toggle-enf-tag').classList.remove('border-rose-400', 'bg-rose-950/60');
+      }, 80);
+    }
+  </script>
+</body>
+</html>
