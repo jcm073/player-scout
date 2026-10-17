@@ -99,3 +99,39 @@ O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.
   - **Testes Automatizados de Contrato Web em Rust & REST Client:**
     - Novo teste fim a fim `test_web_askama_htmx_dashboard_and_touch_first_court_flow` em `rust/tests/api_integration_tests.rs` validando SSR Askama, Chart.js `4.4.9`, ergonomia Touch-First, fragmentos HTMX, auto-vínculo ENF→Miss, Undo e bloqueio RBAC (`403 Forbidden` para `Player` Read-Only).
     - Script interativo `http/05_web_htmx.http` adicionado à coleção do plugin REST Client.
+- **Autenticação, Cadastro Completo, Hash Argon2i & Estrutura OAuth2 (Fase 4.5):**
+  - **Migração `migrations/004_auth_registration_and_oauth.sql`:**
+    - Expansão da tabela `users` com campos obrigatórios de cadastro: `first_name`, `last_name`, `age`, `cpf` (`UNIQUE`), `whatsapp_phone`, `cep`, `street`, `street_number`, `complement` (limitado a até 10 caracteres), `neighborhood`, `city`, `state` (UF) e `preferred_side` (posição que joga: Direita/Drive ou Esquerda/Revés).
+    - Criação do tipo `oauth_provider_enum` (`google`, `microsoft`, `instagram`) e da tabela `user_oauth_accounts`.
+  - **Segurança de Senhas com `Argon2i` (`rust/src/domain/auth.rs`):**
+    - Adição da crate oficial auditada `argon2 = "0.5.3"` (`RustCrypto`) configurada explicitamente com `Algorithm::Argon2i` (`$argon2i$v=19$...`).
+    - Política de senha exigindo mínimo de **12 caracteres**, contendo ao menos **1 letra maiúscula**, **1 letra minúscula**, **1 número** e **1 caractere especial**.
+  - **Validações Cadastrais e Automação de Perfil `Player` (`rust/src/db/mod.rs`):**
+    - Validação matemática dos dígitos verificadores do **CPF** (Módulo 11) e normalização de CPF (11 dígitos) e CEP (8 dígitos).
+    - Validação estrita do **Complemento** (até 10 caracteres alfanuméricos sem caracteres especiais, permitindo vazio para residências sem bloco/apto).
+    - Criação automática do perfil esportivo na tabela `players` quando `role == player`, propagando o nome completo e a posição em quadra (`preferred_side`).
+  - **Endpoints de Login Exclusivo por E-mail, Busca por Chave (`CPF`/`Email`) e OAuth2 (`rust/src/api/auth.rs` e `rust/src/api/web.rs`):**
+    - `POST /api/v1/auth/register`, `POST /api/v1/auth/login` (exclusivo por e-mail), `GET /api/v1/auth/lookup` (por `cpf` ou `email`), `GET /api/v1/auth/oauth/{provider}/authorize` e `POST /api/v1/auth/oauth/{provider}/callback`.
+    - Telas Web SSR + HTMX (`GET /web/login`, `GET /web/register`, `POST /web/partials/auth/login`, `POST /web/partials/auth/register`).
+  - **Testes Automatizados em Rust & Scripts REST Client:**
+    - Novos testes unitários e de integração (`test_argon2i_password_hashing_and_policy_validation`, `test_cpf_modulo_11_and_complement_validation`, `test_phase_4_5_registration_argon2i_login_cpf_lookup_and_oauth`) com **16/16 testes aprovados (100%)**.
+    - Adicionado script `http/06_auth_and_oauth.http`.
+- **Controle de Sessão Única (12h), Proteção contra Força Bruta & Hardening de Segurança (Fases 4.6 & 4.7):**
+  - **Migração `migrations/005_user_sessions_and_brute_force.sql`:**
+    - Criação da tabela `user_sessions` (`id`, `user_id UNIQUE`, `token_hash`, `created_at_epoch`, `expires_at_epoch`) garantindo **sessão ativa única por usuário** no nível do PostgreSQL 18.
+    - Adição de `failed_login_attempts` e `locked_until_epoch` em `users` para controle persistente de força bruta.
+  - **Sessão Stateful de 12 Horas com `Argon2i` Unificado (Sem JWT):**
+    - Reutilização da mesma crate `argon2` (`Algorithm::Argon2i`) tanto para senhas quanto para o hash de verificação dos tokens de sessão (`ps_sess_<uuid_v7_simple>_<secret>`), garantindo revogação instantânea e zero dependências extras.
+    - Middleware `require_session_middleware` exigindo sessão ativa em todas as páginas Web (`/`, `/web/dashboard`, `/web/court`, `/web/partials/*`) e rotas protegidas da API (`/api/v1/*`).
+    - Exclusão física imediata (`DELETE FROM user_sessions`) no logoff (`POST /api/v1/auth/logout` e `POST /web/auth/logout`), ao detectar sessão expirada (> 12 horas) ou ao realizar novo login do mesmo usuário.
+  - **Proteção contra Força Bruta & Mitigação de Timing Side-Channel:**
+    - Bloqueio automático por **15 minutos** (`429 Too Many Requests`) após **5 tentativas consecutivas** de senha inválida.
+    - Execução de `verify_dummy_password_argon2i` quando o e-mail não é encontrado e retorno de mensagem uniforme (`"E-mail ou senha inválidos"`) nas tentativas 1..4.
+  - **Hardening de Controles de Acesso (RBAC, Anti-Spoofing / BOLA, LGPD, Rotação de Senha & Anti-CSRF):**
+    - Bloqueio de escalação de privilégio no auto-cadastro público (`role: Admin` rejeitado com `422 FORBIDDEN_ROLE_IN_REGISTRATION`).
+    - Proteção Anti-Spoofing / BOLA (`AuthenticatedUser::resolve_actor_id`) impedindo que `Player` ou `Coach` passem `actor_id` de outro usuário (`403 Forbidden`).
+    - Proteção de Privacidade / LGPD restringindo `GET /api/v1/users`, `POST /api/v1/users` e `GET /api/v1/auth/lookup` a `Coach` e `Admin`, e restringindo `GET /api/v1/users/{id}` aos próprios dados quando o ator é `Player`.
+    - Novo endpoint `POST /api/v1/auth/password` para troca de senha com validação `Argon2i` e rotação imediata da sessão única de 12 horas.
+    - Defesa Anti-CSRF via Fetch Metadata (`Sec-Fetch-Site: cross-site` bloqueado com `403 Forbidden` em métodos mutáveis) e cabeçalhos `Cache-Control: no-store, no-cache, must-revalidate` e `Content-Security-Policy`.
+  - **Testes Automatizados 100% em Rust:**
+    - 15 testes unitários em `rust/tests/domain_validation_tests.rs` e 5 suítes de integração fim a fim em `rust/tests/api_integration_tests.rs` (**20/20 testes aprovados — 100%**).

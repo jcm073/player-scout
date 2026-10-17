@@ -24,7 +24,7 @@
         </div>
       </div>
 
-      <nav class="flex items-center gap-2">
+      <nav class="flex flex-wrap items-center gap-2">
         <a
           href="/?actor_id={{ actor_id }}&player_id={{ player_id }}{% if let Some(m) = match_id %}&match_id={{ m }}{% endif %}"
           class="min-h-[44px] px-4 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold flex items-center"
@@ -37,6 +37,26 @@
         >
           🎾 Modo Quadra (Touch-First)
         </a>
+        <a
+          href="/web/register"
+          class="min-h-[44px] px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-bold flex items-center"
+        >
+          📝 Cadastro
+        </a>
+        <a
+          href="/web/login"
+          class="min-h-[44px] px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-bold flex items-center"
+        >
+          🔐 Login
+        </a>
+        <form action="/web/auth/logout" method="POST" class="inline">
+          <button
+            type="submit"
+            class="min-h-[44px] px-3.5 py-2 rounded-xl bg-rose-950/80 hover:bg-rose-900 border border-rose-700 text-rose-200 text-xs font-bold flex items-center"
+          >
+            🚪 Sair (Logoff)
+          </button>
+        </form>
       </nav>
     </div>
   </header>

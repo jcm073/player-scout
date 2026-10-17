@@ -16,6 +16,12 @@ pub enum AppError {
     #[error("Acesso negado: {0}")]
     Forbidden(String),
 
+    #[error("Não autenticado: {0}")]
+    Unauthorized(String),
+
+    #[error("Muitas tentativas de login: {0}")]
+    TooManyRequests(String),
+
     #[error("Conflito de recurso: {0}")]
     Conflict(String),
 
@@ -57,6 +63,8 @@ impl IntoResponse for AppError {
             AppError::Domain(err) => (StatusCode::UNPROCESSABLE_ENTITY, err.code()),
             AppError::NotFound(_) => (StatusCode::NOT_FOUND, "NOT_FOUND"),
             AppError::Forbidden(_) => (StatusCode::FORBIDDEN, "FORBIDDEN"),
+            AppError::Unauthorized(_) => (StatusCode::UNAUTHORIZED, "UNAUTHORIZED"),
+            AppError::TooManyRequests(_) => (StatusCode::TOO_MANY_REQUESTS, "TOO_MANY_REQUESTS"),
             AppError::Conflict(_) => (StatusCode::CONFLICT, "CONFLICT"),
             AppError::BadRequest(_) => (StatusCode::BAD_REQUEST, "BAD_REQUEST"),
             AppError::Database(_) => (StatusCode::INTERNAL_SERVER_ERROR, "DATABASE_ERROR"),

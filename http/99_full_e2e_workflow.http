@@ -217,3 +217,55 @@ Content-Type: application/json
     "to_date": null
   }
 }
+
+###
+
+### Passo 17: Cadastro Completo (Fase 4.5) com Argon2i, Posição em Quadra e Criação Automática de Perfil Player
+# @name registerFullPlayer
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "first_name": "Agustín",
+  "last_name": "Tapia",
+  "age": 25,
+  "cpf": "390.533.447-05",
+  "email": "tapia.{{$guid}}@playerscout.test",
+  "whatsapp_phone": "(51) 99111-2233",
+  "cep": "90570-020",
+  "street": "Rua Padre Chagas",
+  "street_number": "500",
+  "complement": "Bloco B",
+  "neighborhood": "Moinhos de Vento",
+  "city": "Porto Alegre",
+  "state": "RS",
+  "role": "player",
+  "preferred_side": "left",
+  "dominant_hand": "right_handed",
+  "password": "TapiaMozart2026!@"
+}
+
+###
+
+### Passo 18: Login Exclusivo por E-mail com Verificação Argon2i
+# @name loginFullPlayer
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{registerFullPlayer.response.body.user.email}}",
+  "password": "TapiaMozart2026!@"
+}
+
+###
+
+### Passo 19: Busca de Usuário pela Chave Única (CPF ou E-mail)
+GET {{baseUrl}}/auth/lookup?cpf=39053344705
+Accept: application/json
+
+###
+
+### Passo 20: Obter URL de Autorização OAuth2 (Google / Gmail)
+GET {{baseUrl}}/auth/oauth/google/authorize
+Accept: application/json
+

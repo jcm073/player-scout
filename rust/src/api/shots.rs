@@ -1,5 +1,5 @@
 use axum::{
-    Json,
+    Extension, Json,
     extract::{Path, Query, State},
     http::StatusCode,
 };
@@ -9,7 +9,7 @@ use uuid::Uuid;
 use crate::{
     api::players::ActorQuery,
     db::{Database, NewShotInput},
-    domain::{DecisionQuality, ShotEvent, ShotOutcome, ShotType, SpecialTag},
+    domain::{AuthenticatedUser, DecisionQuality, ShotEvent, ShotOutcome, ShotType, SpecialTag},
     error::Result,
 };
 
@@ -31,12 +31,14 @@ pub struct UndoShotRequest {
 
 pub async fn record_shot(
     State(db): State<Database>,
+    Extension(auth_user): Extension<AuthenticatedUser>,
     Path(match_id): Path<Uuid>,
     Json(payload): Json<RecordShotRequest>,
 ) -> Result<(StatusCode, Json<ShotEvent>)> {
+    let actor_id = auth_user.resolve_actor_id(Some(payload.actor_id))?;
     let shot = db
         .record_shot(
-            payload.actor_id,
+            actor_id,
             match_id,
             NewShotInput {
                 player_id: payload.player_id,
@@ -54,18 +56,22 @@ pub async fn record_shot(
 
 pub async fn list_shots(
     State(db): State<Database>,
+    Extension(auth_user): Extension<AuthenticatedUser>,
     Path(match_id): Path<Uuid>,
     Query(query): Query<ActorQuery>,
 ) -> Result<Json<Vec<ShotEvent>>> {
-    let shots = db.list_shots_by_match(query.actor_id, match_id).await?;
+    let actor_id = auth_user.resolve_actor_id(Some(query.actor_id))?;
+    let shots = db.list_shots_by_match(actor_id, match_id).await?;
     Ok(Json(shots))
 }
 
 pub async fn undo_last_shot(
     State(db): State<Database>,
+    Extension(auth_user): Extension<AuthenticatedUser>,
     Path(match_id): Path<Uuid>,
     Json(payload): Json<UndoShotRequest>,
 ) -> Result<Json<ShotEvent>> {
-    let undone = db.undo_last_shot(payload.actor_id, match_id).await?;
+    let actor_id = auth_user.resolve_actor_id(Some(payload.actor_id))?;
+    let undone = db.undo_last_shot(actor_id, match_id).await?;
     Ok(Json(undone))
 }

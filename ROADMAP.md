@@ -13,8 +13,9 @@ Este arquivo é a fonte oficial do estado de evolução do projeto. Toda fase e 
 | **Fase 2** | Backend Rust (Axum, API REST & Ingestão em Quadra) | **Concluído** | 100% |
 | **Fase 3** | Motor Analítico, Agregação Recursiva & Modo Comparativo | **Concluído** | 100% |
 | **Fase 4** | Frontend Web (Askama, HTMX 4.x, Chart.js & Mobile Touch) | **Concluído** | 100% |
+| **Fase 4.5** | Autenticação, Cadastro Completo, Hash Argon2i & OAuth2 | **Concluído** | 100% |
 | **Fase 5** | Clientes Móveis (Kotlin / KMP para Android e iOS) | **Pendente** | 0% |
-| **Fase 6** | Testes Automatizados 100% em Rust, CI/CD & Auditoria | **Em Andamento** | 85% |
+| **Fase 6** | Testes Automatizados 100% em Rust, CI/CD & Auditoria | **Em Andamento** | 90% |
 
 > **Legenda de Status:**
 > - `[x]` Concluído
@@ -115,6 +116,43 @@ Este arquivo é a fonte oficial do estado de evolução do projeto. Toda fase e 
 
 ---
 
+### Fase 4.5: Autenticação, Cadastro Completo, Hash Argon2i & OAuth2
+- [x] Migração `004_auth_registration_and_oauth.sql` adicionando campos cadastrais obrigatórios (`first_name`, `last_name`, `age`, `cpf` UNIQUE, `whatsapp_phone`, `cep`, `street`, `street_number`, `complement` até 10 caracteres, `neighborhood`, `city`, `state` UF e `preferred_side` [posição que joga: Direita/Drive ou Esquerda/Revés]) e tabela `user_oauth_accounts`.
+- [x] Segurança de Senha com **Argon2i** (`argon2 = "0.5.3"`):
+  - Validação estrita exigindo mínimo de **12 caracteres**, ao menos **1 letra maiúscula**, **1 letra minúscula**, **1 número** e **1 caractere especial**.
+  - Armazenamento em formato PHC `$argon2i$v=19$...` com salt criptográfico por usuário.
+- [x] Validações Cadastrais e Criação Automática do Perfil `Player`:
+  - Validação matemática dos dígitos verificadores do **CPF** (Módulo 11) e normalização de CPF (11 dígitos) e CEP (8 dígitos).
+  - Validação estrita do **Complemento**: limitado a até 10 caracteres alfanuméricos sem caracteres especiais (podendo ficar em branco para casas sem bloco/apto).
+  - Criação automática do perfil esportivo na tabela `players` quando o cadastro é do tipo `Player`, incluindo a posição em quadra (`preferred_side`).
+- [x] Login Exclusivo por E-mail & Chaves Únicas de Identificação (`CPF` e `Email`):
+  - `POST /api/v1/auth/register` e `POST /api/v1/auth/login` (restrito a E-mail + senha Argon2i).
+  - `GET /api/v1/auth/lookup` permitindo localizar o usuário tanto por `cpf` quanto por `email`.
+  - Telas Web SSR + HTMX (`GET /web/login`, `GET /web/register`, `POST /web/partials/auth/login` e `POST /web/partials/auth/register`).
+- [x] Estrutura de Integração OAuth2 (`Google/Gmail`, `Microsoft Office` e `Instagram`):
+  - Endpoints `GET /api/v1/auth/oauth/{provider}/authorize` e `POST /api/v1/auth/oauth/{provider}/callback` mapeados no Toasty ORM (`UserOAuthRecord`).
+- [ ] **Task Dedicada OAuth2 (Homologação de Provedores Externos):** Configurar credenciais reais de cliente OAuth2 nos consoles de desenvolvedor do **Google Cloud (Gmail)**, **Microsoft Entra ID (Office)** e **Meta for Developers (Instagram)** e validar troca de código de autorização em ambiente de homologação/produção.
+
+---
+
+### Fase 4.6 & 4.7: Controle de Sessão Única (12h), Força Bruta & Hardening de Segurança (Concluída ✅)
+- [x] **Controle de Sessão Única com Duração de 12 Horas (`43.200s`) e Exclusão Física (`DELETE`):**
+  - Migração [005_user_sessions_and_brute_force.sql](file:///home/jc/codigos/rust/player-scout/migrations/005_user_sessions_and_brute_force.sql) criando `user_sessions` (`UNIQUE (user_id)`) e colunas `failed_login_attempts` / `locked_until_epoch` em `users`.
+  - Uso unificado da mesma biblioteca `argon2` (`Argon2i`) tanto para senhas quanto para o hash de verificação dos tokens de sessão (`ps_sess_<uuid_v7_simple>_<secret>`), sem necessidade de JWT.
+  - Middleware `require_session_middleware` exigindo sessão ativa em todas as páginas Web (`/`, `/web/dashboard`, `/web/court`, `/web/partials/*`) e rotas protegidas da API (`/api/v1/*`).
+  - Exclusão física imediata (`DELETE FROM user_sessions`) no logoff (`POST /api/v1/auth/logout` e `POST /web/auth/logout`), na expiração de 12 horas e ao iniciar novo login do mesmo usuário.
+- [x] **Proteção contra Força Bruta & Mitigação de Timing Attack no Login:**
+  - Bloqueio automático da conta por **15 minutos** (`429 Too Many Requests`) após **5 tentativas consecutivas** de senha incorreta.
+  - Execução de `verify_dummy_password_argon2i` quando o e-mail não existe no banco e mensagens uniformes (`"E-mail ou senha inválidos"`) nas tentativas 1..4 para impedir enumeração de contas.
+- [x] **Hardening de Controles de Acesso (RBAC, Anti-Spoofing / BOLA, LGPD, Rotação de Senha & Anti-CSRF):**
+  - Bloqueio de escalação de privilégio no auto-cadastro público (`role: Admin` rejeitado com `422 FORBIDDEN_ROLE_IN_REGISTRATION`).
+  - Proteção Anti-Spoofing / BOLA (`AuthenticatedUser::resolve_actor_id`): impede que `Player` ou `Coach` falsifiquem o `actor_id` de outro usuário na query string ou no payload JSON (`403 Forbidden`).
+  - Proteção de Dados Pessoais (LGPD): restringe `GET /api/v1/users`, `POST /api/v1/users` e `GET /api/v1/auth/lookup` a `Coach` e `Admin`, e restringe `GET /api/v1/users/{id}` para que um `Player` acesse somente o seu próprio registro.
+  - Endpoint `POST /api/v1/auth/password` para troca de senha com validação `Argon2i` e rotação imediata da sessão única de 12 horas.
+  - Defesa Anti-CSRF baseada em Fetch Metadata (`Sec-Fetch-Site: cross-site` bloqueado com `403 Forbidden`) e cabeçalhos `Cache-Control: no-store, no-cache, must-revalidate` e `Content-Security-Policy`.
+
+---
+
 ### Fase 5: Clientes Móveis (Kotlin / KMP)
 - [ ] Avaliação da arquitetura Kotlin Multiplatform (KMP). 📍 **ETAPA ATUAL**
 - [ ] Implementação do módulo compartilhado (camada de rede, modelos e cache offline para uso em quadra sem sinal).
@@ -124,10 +162,10 @@ Este arquivo é a fonte oficial do estado de evolução do projeto. Toda fase e 
 ---
 
 ### Fase 6: Testes Automatizados (100% em Rust) & Auditoria
-- [x] Testes unitários em Rust para validações de regras de negócio esportivas.
-- [x] Testes de integração em Rust contra o PostgreSQL 18+ (validando persistência, constraints e queries do Toasty).
+- [x] Testes unitários em Rust para validações de regras de negócio esportivas, CPF (Módulo 11), complemento, política de senha Argon2i, tokens de sessão Argon2i (12h), bloqueio de escalação `Admin` e resolução BOLA de `actor_id` (15 testes unitários).
+- [x] Testes de integração em Rust contra o PostgreSQL 18+ (validando persistência, constraints, sessão única de 12h, exclusão no logoff/expiração, força bruta, BOLA, LGPD, rotação de senha e Anti-CSRF).
 - [x] Testes em Rust para cálculos matemáticos analíticos e deltas do comparativo.
-- [x] Testes de contrato de interface Web (validando respostas HTML/Askama, Chart.js 4.4.9, fluxo Touch-First e fragmentos HTMX).
+- [x] Testes de contrato de interface Web e Autenticação (validando respostas HTML/Askama, Chart.js 4.4.9, fluxo Touch-First, cadastro completo, login Argon2i e OAuth2).
 - [x] Pipeline de validação estática: `cargo fmt --check`, `cargo clippy -- -D warnings`.
 - [ ] Auditoria de segurança de dependências com `cargo audit`.
 

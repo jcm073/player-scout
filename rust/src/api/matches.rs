@@ -1,12 +1,17 @@
 use axum::{
-    Json,
+    Extension, Json,
     extract::{Path, Query, State},
     http::StatusCode,
 };
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::{api::players::ActorQuery, db::Database, domain::MatchSession, error::Result};
+use crate::{
+    api::players::ActorQuery,
+    db::Database,
+    domain::{AuthenticatedUser, MatchSession},
+    error::Result,
+};
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct CreateMatchRequest {
@@ -18,11 +23,13 @@ pub struct CreateMatchRequest {
 
 pub async fn create_match(
     State(db): State<Database>,
+    Extension(auth_user): Extension<AuthenticatedUser>,
     Json(payload): Json<CreateMatchRequest>,
 ) -> Result<(StatusCode, Json<MatchSession>)> {
+    let actor_id = auth_user.resolve_actor_id(Some(payload.actor_id))?;
     let session = db
         .create_match(
-            payload.actor_id,
+            actor_id,
             payload.player_id,
             payload.opponent_name,
             payload.notes,
@@ -34,12 +41,14 @@ pub async fn create_match(
 
 pub async fn get_match(
     State(db): State<Database>,
+    Extension(auth_user): Extension<AuthenticatedUser>,
     Path(id): Path<Uuid>,
     Query(query): Query<ActorQuery>,
 ) -> Result<Json<MatchSession>> {
+    let actor_id = auth_user.resolve_actor_id(Some(query.actor_id))?;
     let session = db.get_match_by_id(id).await?;
     let _player = db
-        .verify_player_read_access(query.actor_id, session.player_id)
+        .verify_player_read_access(actor_id, session.player_id)
         .await?;
     Ok(Json(session))
 }
