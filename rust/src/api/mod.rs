@@ -1,3 +1,4 @@
+pub mod analytics;
 pub mod health;
 pub mod matches;
 pub mod players;
@@ -45,6 +46,14 @@ pub fn app_router(db: Database) -> Router {
         .route(
             "/api/v1/matches/{id}/shots/undo",
             post(shots::undo_last_shot),
+        )
+        .route(
+            "/api/v1/analytics/players/{id}",
+            get(analytics::get_player_analytics),
+        )
+        .route(
+            "/api/v1/analytics/compare",
+            post(analytics::compare_analytics),
         )
         .with_state(db)
         .layer(TraceLayer::new_for_http())

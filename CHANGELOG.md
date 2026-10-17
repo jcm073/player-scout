@@ -76,5 +76,18 @@ O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.
     - `POST /api/v1/matches/{id}/shots`, `GET /api/v1/matches/{id}/shots` e `POST /api/v1/matches/{id}/shots/undo` (rollback da última jogada por ordenação decrescente de UUIDv7).
   - Suíte de testes de integração fim a fim (`rust/tests/api_integration_tests.rs`) validando persistência real no PostgreSQL 18, relacionamento N:N multi-coach, isolamento RBAC e undo de jogadas (9/9 testes aprovados).
   - Coleção dedicada de scripts `.http` em `http/` para o plugin **REST Client** (`00_health.http`, `01_users.http`, `02_players_and_rbac.http`, `03_matches_and_shots.http` e `99_full_e2e_workflow.http` com encadeamento automático de variáveis `# @name`).
+- **Motor Analítico Recursivo & Modo Comparativo Lado a Lado (Conclusão da Fase 3):**
+  - Implementação do motor matemático e agregador recursivo em `rust/src/domain/analytics.rs`:
+    - `AnalyticsFilter`: Escopo flexível por carreira completa, partida (`match_id`), set (`set_number`) ou intervalo de datas (`from_date` / `to_date`).
+    - `DecisionExecutionMatrix`: Matriz Tática de Ouro em 4 quadrantes (*Acertou + Boa*, *Acertou + Ruim*, *Errou + Boa*, *Errou + Ruim*) com percentuais arredondados.
+    - `ZoneMetrics`: Eficiência segmentada pelas 3 zonas do Padel (*Início de Ponto*, *Rede & Ataque*, *Fundo & Vidros*).
+    - `PadelRadarMetrics`: Radar de 6 eixos (*Saque & Recepção*, *Domínio de Rede*, *Jogo Aéreo & Definição*, *Fundo & Globos*, *Uso dos Vidros*, *Maturidade Tática*).
+    - `ShotTypeBreakdown`: Estatísticas detalhadas por tipo de golpe com contagem de Winners e Erros Não Forçados.
+    - `AnalyticsComparisonReport` & `ComparisonDeltas`: Comparação lado a lado entre Escopo A e Escopo B com cálculo automático de deltas ($B - A$) globais e por golpe.
+  - Endpoints REST analíticos em `rust/src/api/analytics.rs`:
+    - `GET /api/v1/analytics/players/{id}` (agregação recursiva com verificação de permissão RBAC).
+    - `POST /api/v1/analytics/compare` (comparação pareada de dois escopos).
+  - Scripts REST Client atualizados (`http/04_analytics_and_compare.http` e passos 14 a 16 em `http/99_full_e2e_workflow.http`) e 12 testes automatizados (unitários + integração) com 100% de aprovação.
+
 
 

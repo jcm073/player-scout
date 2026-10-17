@@ -5,6 +5,7 @@ use axum::{
 use player_scout::{
     AppConfig, Database,
     api::{
+        analytics::CompareAnalyticsRequest,
         matches::CreateMatchRequest,
         players::{AssignCoachRequest, CreatePlayerRequest},
         shots::{RecordShotRequest, UndoShotRequest},
@@ -12,8 +13,9 @@ use player_scout::{
     },
     create_app,
     domain::{
-        CoachPlayer, DecisionQuality, DominantHand, MatchSession, Player, PreferredSide, ShotEvent,
-        ShotOutcome, ShotType, SpecialTag, User, UserRole,
+        AnalyticsComparisonReport, AnalyticsFilter, CoachPlayer, DecisionQuality, DominantHand,
+        MatchSession, Player, PlayerAnalyticsReport, PreferredSide, ShotEvent, ShotOutcome,
+        ShotType, SpecialTag, User, UserRole,
     },
     error::ErrorResponse,
 };
@@ -364,4 +366,95 @@ async fn test_end_to_end_toasty_persistence_rbac_and_shot_undo() {
     assert_eq!(remaining_shots.len(), 2);
     assert_eq!(remaining_shots[0].id, shot1.id);
     assert_eq!(remaining_shots[1].id, shot2.id);
+
+    // 10. Registra uma jogada no Set 1 (erro) e duas jogadas no Set 2 para testar o Motor Analítico e Comparativo
+    let (status, _shot_s1_miss): (StatusCode, ShotEvent) = send_json(
+        &app,
+        Method::POST,
+        &format!("/api/v1/matches/{}/shots", match_session.id),
+        Some(&RecordShotRequest {
+            actor_id: coach_tactical.id,
+            player_id: player_lucas.id,
+            set_number: 1,
+            shot_type: ShotType::BajadaParede,
+            outcome: ShotOutcome::Miss,
+            decision: Some(DecisionQuality::Bad),
+            special_tag: Some(SpecialTag::UnforcedError),
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED);
+
+    // Set 2: 2 jogadas perfeitas (100% hit rate no Set 2 vs 66.67% no Set 1)
+    for shot_type in [ShotType::Saque, ShotType::VoleioDireita] {
+        let (status, _): (StatusCode, ShotEvent) = send_json(
+            &app,
+            Method::POST,
+            &format!("/api/v1/matches/{}/shots", match_session.id),
+            Some(&RecordShotRequest {
+                actor_id: coach_tactical.id,
+                player_id: player_lucas.id,
+                set_number: 2,
+                shot_type,
+                outcome: ShotOutcome::Hit,
+                decision: Some(DecisionQuality::Good),
+                special_tag: None,
+            }),
+        )
+        .await;
+        assert_eq!(status, StatusCode::CREATED);
+    }
+
+    // 11. Agregação Recursiva: Consulta Geral da Partida pelo Atleta (5 jogadas totais: 4 hits, 1 miss = 80%)
+    let (status, analytics_match): (StatusCode, PlayerAnalyticsReport) = send_json::<(), _>(
+        &app,
+        Method::GET,
+        &format!(
+            "/api/v1/analytics/players/{}?actor_id={}&match_id={}",
+            player_lucas.id, athlete_user.id, match_session.id
+        ),
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(analytics_match.total_shots, 5);
+    assert_eq!(analytics_match.hits, 4);
+    assert_eq!(analytics_match.misses, 1);
+    assert_eq!(analytics_match.hit_rate_pct, 80.0);
+    assert_eq!(analytics_match.matrix.hit_good, 4);
+    assert_eq!(analytics_match.matrix.miss_bad, 1);
+    assert_eq!(analytics_match.winners, 1);
+    assert_eq!(analytics_match.unforced_errors, 1);
+    assert_eq!(analytics_match.winner_to_ue_balance, 0);
+
+    // 12. Modo Comparativo Lado a Lado: Set 1 (66.67% acerto) vs Set 2 (100% acerto)
+    let (status, comparison): (StatusCode, AnalyticsComparisonReport) = send_json(
+        &app,
+        Method::POST,
+        "/api/v1/analytics/compare",
+        Some(&CompareAnalyticsRequest {
+            actor_id: athlete_user.id,
+            player_id: player_lucas.id,
+            scope_a: AnalyticsFilter {
+                match_id: Some(match_session.id),
+                set_number: Some(1),
+                from_date: None,
+                to_date: None,
+            },
+            scope_b: AnalyticsFilter {
+                match_id: Some(match_session.id),
+                set_number: Some(2),
+                from_date: None,
+                to_date: None,
+            },
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(comparison.scope_a.total_shots, 3);
+    assert_eq!(comparison.scope_a.hit_rate_pct, 66.67);
+    assert_eq!(comparison.scope_b.total_shots, 2);
+    assert_eq!(comparison.scope_b.hit_rate_pct, 100.0);
+    assert_eq!(comparison.deltas.hit_rate_delta_pct, 33.33);
+    assert_eq!(comparison.deltas.good_decision_rate_delta_pct, 33.33);
 }
