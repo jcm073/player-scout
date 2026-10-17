@@ -1,0 +1,55 @@
+<div id="court-feed-content" class="space-y-3">
+  {% if let Some(msg) = status_banner %}
+  <div class="px-3.5 py-2 rounded-lg bg-emerald-950/80 border border-emerald-700 text-emerald-200 text-xs font-semibold flex items-center justify-between">
+    <span>{{ msg }}</span>
+    <span class="text-[11px] text-emerald-400">Sincronizado</span>
+  </div>
+  {% endif %}
+
+  <div class="grid grid-cols-3 gap-2 text-center">
+    <div class="bg-slate-800 border border-slate-700 rounded-lg p-2.5">
+      <div class="text-[11px] uppercase text-slate-400">Jogadas</div>
+      <div class="text-lg font-bold text-white">{{ report.total_shots }}</div>
+    </div>
+    <div class="bg-slate-800 border border-slate-700 rounded-lg p-2.5">
+      <div class="text-[11px] uppercase text-slate-400">% Acerto</div>
+      <div class="text-lg font-bold text-emerald-400">{{ report.hit_rate_pct }}%</div>
+    </div>
+    <div class="bg-slate-800 border border-slate-700 rounded-lg p-2.5">
+      <div class="text-[11px] uppercase text-slate-400">% Decisão Boa</div>
+      <div class="text-lg font-bold text-sky-400">{{ report.good_decision_rate_pct }}%</div>
+    </div>
+  </div>
+
+  <div class="bg-slate-800/90 border border-slate-700 rounded-xl p-3">
+    <div class="text-xs font-bold uppercase text-slate-400 mb-2">Últimos Golpes Registrados</div>
+    {% if recent_shots.is_empty() %}
+      <p class="text-xs text-slate-400 py-2">Nenhum golpe registrado ainda nesta partida.</p>
+    {% else %}
+      <div class="space-y-1.5">
+        {% for shot in recent_shots %}
+        <div class="flex items-center justify-between text-xs py-1.5 px-2.5 rounded bg-slate-900/80 border border-slate-700/60">
+          <div class="flex items-center gap-2">
+            <span class="px-1.5 py-0.5 rounded bg-slate-700 text-slate-200 font-semibold">S{{ shot.set_number }}</span>
+            <span class="font-bold text-white">{{ shot.shot_type.label_pt() }}</span>
+          </div>
+          <div class="flex items-center gap-1.5">
+            {% match shot.outcome %}
+              {% when crate::domain::ShotOutcome::Hit %}
+                <span class="px-2 py-0.5 rounded bg-emerald-900/80 text-emerald-300 font-semibold">ACERTOU</span>
+              {% when crate::domain::ShotOutcome::Miss %}
+                <span class="px-2 py-0.5 rounded bg-rose-900/80 text-rose-300 font-semibold">ERROU</span>
+            {% endmatch %}
+            {% match shot.decision %}
+              {% when crate::domain::DecisionQuality::Good %}
+                <span class="px-1.5 py-0.5 rounded bg-sky-900/60 text-sky-300">Boa</span>
+              {% when crate::domain::DecisionQuality::Bad %}
+                <span class="px-1.5 py-0.5 rounded bg-amber-900/70 text-amber-300">Ruim</span>
+            {% endmatch %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  </div>
+</div>

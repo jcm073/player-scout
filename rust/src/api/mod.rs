@@ -4,6 +4,7 @@ pub mod matches;
 pub mod players;
 pub mod shots;
 pub mod users;
+pub mod web;
 
 use axum::{
     Router,
@@ -21,6 +22,19 @@ pub fn app_router(db: Database) -> Router {
         .allow_headers(Any);
 
     Router::new()
+        .route("/", get(web::dashboard_page))
+        .route("/web/dashboard", get(web::dashboard_page))
+        .route("/web/court", get(web::court_page))
+        .route("/web/partials/analytics", get(web::analytics_partial))
+        .route("/web/partials/compare", get(web::compare_partial))
+        .route(
+            "/web/partials/court/shot",
+            post(web::court_record_shot_partial),
+        )
+        .route(
+            "/web/partials/court/undo",
+            post(web::court_undo_shot_partial),
+        )
         .route("/health", get(health::health_check))
         .route("/api/v1/health", get(health::health_check))
         .route(

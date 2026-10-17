@@ -12,9 +12,9 @@ Este arquivo é a fonte oficial do estado de evolução do projeto. Toda fase e 
 | **Fase 1** | Banco de Dados PostgreSQL 18+ & Modelagem com Toasty ORM | **Concluído** | 100% |
 | **Fase 2** | Backend Rust (Axum, API REST & Ingestão em Quadra) | **Concluído** | 100% |
 | **Fase 3** | Motor Analítico, Agregação Recursiva & Modo Comparativo | **Concluído** | 100% |
-| **Fase 4** | Frontend Web (Askama, HTMX 4.x, Chart.js & Mobile Touch) | **Em Andamento** | 0% |
+| **Fase 4** | Frontend Web (Askama, HTMX 4.x, Chart.js & Mobile Touch) | **Concluído** | 100% |
 | **Fase 5** | Clientes Móveis (Kotlin / KMP para Android e iOS) | **Pendente** | 0% |
-| **Fase 6** | Testes Automatizados 100% em Rust, CI/CD & Auditoria | **Em Andamento** | 70% |
+| **Fase 6** | Testes Automatizados 100% em Rust, CI/CD & Auditoria | **Em Andamento** | 85% |
 
 > **Legenda de Status:**
 > - `[x]` Concluído
@@ -96,27 +96,27 @@ Este arquivo é a fonte oficial do estado de evolução do projeto. Toda fase e 
 ---
 
 ### Fase 4: Frontend Web (Askama, HTMX 4.x & Chart.js)
-- [~] Configuração de templates server-side compilados com **Askama**. 📍 **ETAPA ATUAL**
-- [ ] Integração com **HTMX 4.x** para interações dinâmicas sem SPAs pesadas.
-- [ ] Interface do Treinador em Quadra (Touch-First):
-  - Layout responsivo para celular e tablet.
-  - Alvos de toque grandes (mínimo 48px).
-  - Barra de polegar (*Thumb Zone*) com botões `ACERTOU` e `ERROU` fixos na base.
-  - Toggle de *Decisão Ruim* e botões de *Winner* e *ENF*.
-  - Botão de *Undo* visível.
-  - Feedback tátil com API `navigator.vibrate` e atualização via HTMX.
-- [ ] Dashboard do Atleta & Visualizações com **Chart.js** (auditado):
-  - Cards de KPIs reativos com filtros de período.
-  - Gráfico Radar (Spider Chart) das 6 fases do Padel.
-  - Linha do tempo de evolução de acertos e qualidade tática.
-  - Tabela/Barras de aproveitamento por tipo de jogada.
-- [ ] Visualização do Modo Comparativo:
-  - Interface para comparar Set 1 vs Set 2 ou períodos com cartões de deltas e barras emparelhadas.
+- [x] Configuração de templates server-side compilados com **Askama** (`0.16.1`) em `rust/templates/`.
+- [x] Integração com **HTMX** para interações dinâmicas e troca de fragmentos parciais (`/web/partials/*`).
+- [x] Interface do Treinador em Quadra (Touch-First) (`GET /web/court`):
+  - Layout responsivo para celular e tablet sem atalhos de teclado.
+  - Alvos de toque grandes (mínimo `48px` para seletores e `64px` para botões da *Thumb Zone*).
+  - Barra de polegar (*Thumb Zone*) com botões `ACERTOU (IN)` e `ERROU (OUT)` fixos na base.
+  - Toggle de *Decisão Ruim* e botões de *Winner* e *Erro Não Forçado (ENF)* com auto-vínculo de resultado (`ENF` força `Miss`, `Winner` força `Hit`).
+  - Botão de *Desfazer (Undo)* visível no topo da tela.
+  - Feedback tátil com API `navigator.vibrate` e atualização parcial do feed via HTMX (`POST /web/partials/court/shot` e `POST /web/partials/court/undo`).
+- [x] Dashboard do Atleta & Visualizações com **Chart.js 4.4.9** (auditado contra CVEs) (`GET /` e `GET /web/dashboard`):
+  - Cards de KPIs reativos com filtros recursivos de escopo (Carreira, Partida, Set 1, Set 2).
+  - Matriz Tática Decisão × Execução em 4 quadrantes.
+  - Gráfico Radar (Spider Chart) das 6 fases do Padel renderizado com Chart.js `4.4.9`.
+  - Tabela e indicadores de aproveitamento por zona e por tipo de jogada.
+- [x] Visualização do Modo Comparativo (`GET /web/partials/compare`):
+  - Interface para comparar `Set 1 vs Set 2` com cartões de deltas (▲/▼) e barras pareadas de aproveitamento por golpe.
 
 ---
 
 ### Fase 5: Clientes Móveis (Kotlin / KMP)
-- [ ] Avaliação da arquitetura Kotlin Multiplatform (KMP).
+- [ ] Avaliação da arquitetura Kotlin Multiplatform (KMP). 📍 **ETAPA ATUAL**
 - [ ] Implementação do módulo compartilhado (camada de rede, modelos e cache offline para uso em quadra sem sinal).
 - [ ] Cliente Android (Android 13+) em Jetpack Compose.
 - [ ] Camada cliente iOS (avaliação de Compose Multiplatform ou camada hospedeira Swift conforme [AGENTS.md](file:///home/jc/codigos/rust/player-scout/AGENTS.md)).
@@ -127,7 +127,7 @@ Este arquivo é a fonte oficial do estado de evolução do projeto. Toda fase e 
 - [x] Testes unitários em Rust para validações de regras de negócio esportivas.
 - [x] Testes de integração em Rust contra o PostgreSQL 18+ (validando persistência, constraints e queries do Toasty).
 - [x] Testes em Rust para cálculos matemáticos analíticos e deltas do comparativo.
-- [ ] Testes de contrato de interface Web (validando respostas HTMX e Askama).
+- [x] Testes de contrato de interface Web (validando respostas HTML/Askama, Chart.js 4.4.9, fluxo Touch-First e fragmentos HTMX).
 - [x] Pipeline de validação estática: `cargo fmt --check`, `cargo clippy -- -D warnings`.
 - [ ] Auditoria de segurança de dependências com `cargo audit`.
 

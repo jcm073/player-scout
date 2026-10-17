@@ -1,0 +1,194 @@
+<div id="analytics-panel-content" class="space-y-6">
+  <!-- 4 Cards Principais de KPIs -->
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+    <div class="bg-slate-800/80 border border-slate-700 rounded-xl p-4">
+      <div class="text-xs font-semibold uppercase tracking-wider text-slate-400">Taxa de Acerto (In)</div>
+      <div class="mt-2 flex items-baseline gap-2">
+        <span class="text-3xl font-bold text-emerald-400">{{ report.hit_rate_pct }}%</span>
+        <span class="text-xs text-slate-400">({{ report.hits }}/{{ report.total_shots }})</span>
+      </div>
+      <div class="mt-2 w-full bg-slate-700 h-2 rounded-full overflow-hidden">
+        <div class="bg-emerald-500 h-full" style="width: {{ report.hit_rate_pct }}%"></div>
+      </div>
+    </div>
+
+    <div class="bg-slate-800/80 border border-slate-700 rounded-xl p-4">
+      <div class="text-xs font-semibold uppercase tracking-wider text-slate-400">Qualidade de Decisão</div>
+      <div class="mt-2 flex items-baseline gap-2">
+        <span class="text-3xl font-bold text-sky-400">{{ report.good_decision_rate_pct }}%</span>
+        <span class="text-xs text-slate-400">({{ report.good_decisions }} boas)</span>
+      </div>
+      <div class="mt-2 w-full bg-slate-700 h-2 rounded-full overflow-hidden">
+        <div class="bg-sky-500 h-full" style="width: {{ report.good_decision_rate_pct }}%"></div>
+      </div>
+    </div>
+
+    <div class="bg-slate-800/80 border border-slate-700 rounded-xl p-4">
+      <div class="text-xs font-semibold uppercase tracking-wider text-slate-400">Saldo Winner / ENF</div>
+      <div class="mt-2 flex items-baseline gap-2">
+        <span class="text-3xl font-bold {% if report.winner_to_ue_balance >= 0 %}text-emerald-400{% else %}text-rose-400{% endif %}">
+          {% if report.winner_to_ue_balance > 0 %}+{% endif %}{{ report.winner_to_ue_balance }}
+        </span>
+        <span class="text-xs text-slate-400">({{ report.winners }}W / {{ report.unforced_errors }}UE)</span>
+      </div>
+      <div class="mt-2 text-xs text-slate-400">Winners vs Erros Não Forçados</div>
+    </div>
+
+    <div class="bg-slate-800/80 border border-slate-700 rounded-xl p-4">
+      <div class="text-xs font-semibold uppercase tracking-wider text-slate-400">Volume Analisado</div>
+      <div class="mt-2 flex items-baseline gap-2">
+        <span class="text-3xl font-bold text-amber-400">{{ report.total_shots }}</span>
+        <span class="text-xs text-slate-400">golpes</span>
+      </div>
+      <div class="mt-2 text-xs text-slate-400">Escopo recursivo ativo</div>
+    </div>
+  </div>
+
+  <!-- Matriz Tática de Ouro (4 Quadrantes) & Radar Chart.js (6 Fases do Padel) -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <!-- Matriz Decisão x Execução -->
+    <div class="bg-slate-800/80 border border-slate-700 rounded-xl p-5">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <h3 class="text-base font-bold text-white">Matriz Tática: Decisão × Execução</h3>
+          <p class="text-xs text-slate-400">Separação entre maturidade tática e execução técnica</p>
+        </div>
+        <span class="text-xs px-2.5 py-1 rounded-full bg-slate-700 text-slate-300 font-medium">4 Quadrantes</span>
+      </div>
+
+      <div class="grid grid-cols-2 gap-3">
+        <!-- Q1: Acertou + Boa -->
+        <div class="p-4 rounded-xl bg-emerald-950/50 border border-emerald-700/60">
+          <div class="flex justify-between items-center">
+            <span class="text-xs font-bold uppercase text-emerald-300">Acertou + Boa</span>
+            <span class="text-xs font-semibold px-2 py-0.5 rounded bg-emerald-800/70 text-emerald-200">{{ report.matrix.hit_good }}</span>
+          </div>
+          <div class="text-2xl font-extrabold text-emerald-400 mt-2">{{ report.matrix.hit_good_pct }}%</div>
+          <p class="text-xs text-emerald-200/70 mt-1">Jogada Ideal (Tática + Técnica)</p>
+        </div>
+
+        <!-- Q2: Acertou + Ruim -->
+        <div class="p-4 rounded-xl bg-amber-950/50 border border-amber-700/60">
+          <div class="flex justify-between items-center">
+            <span class="text-xs font-bold uppercase text-amber-300">Acertou + Ruim</span>
+            <span class="text-xs font-semibold px-2 py-0.5 rounded bg-amber-800/70 text-amber-200">{{ report.matrix.hit_bad }}</span>
+          </div>
+          <div class="text-2xl font-extrabold text-amber-400 mt-2">{{ report.matrix.hit_bad_pct }}%</div>
+          <p class="text-xs text-amber-200/70 mt-1">Compensação / Falha Adversária</p>
+        </div>
+
+        <!-- Q3: Errou + Boa -->
+        <div class="p-4 rounded-xl bg-sky-950/50 border border-sky-700/60">
+          <div class="flex justify-between items-center">
+            <span class="text-xs font-bold uppercase text-sky-300">Errou + Boa</span>
+            <span class="text-xs font-semibold px-2 py-0.5 rounded bg-sky-800/70 text-sky-200">{{ report.matrix.miss_good }}</span>
+          </div>
+          <div class="text-2xl font-extrabold text-sky-400 mt-2">{{ report.matrix.miss_good_pct }}%</div>
+          <p class="text-xs text-sky-200/70 mt-1">Erro Técnico (Ideia Correta)</p>
+        </div>
+
+        <!-- Q4: Errou + Ruim -->
+        <div class="p-4 rounded-xl bg-rose-950/50 border border-rose-700/60">
+          <div class="flex justify-between items-center">
+            <span class="text-xs font-bold uppercase text-rose-300">Errou + Ruim</span>
+            <span class="text-xs font-semibold px-2 py-0.5 rounded bg-rose-800/70 text-rose-200">{{ report.matrix.miss_bad }}</span>
+          </div>
+          <div class="text-2xl font-extrabold text-rose-400 mt-2">{{ report.matrix.miss_bad_pct }}%</div>
+          <p class="text-xs text-rose-200/70 mt-1">Erro Tático Grave (Foco de Treino)</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Gráfico Radar Chart.js (6 Fases do Padel) -->
+    <div class="bg-slate-800/80 border border-slate-700 rounded-xl p-5 flex flex-col justify-between">
+      <div class="flex items-center justify-between mb-2">
+        <div>
+          <h3 class="text-base font-bold text-white">Radar de Habilidades (6 Fases do Padel)</h3>
+          <p class="text-xs text-slate-400">Visualização multidimensional renderizada com Chart.js</p>
+        </div>
+        <span class="text-xs px-2.5 py-1 rounded-full bg-indigo-900/70 text-indigo-200 font-medium">Chart.js 4.4.9</span>
+      </div>
+
+      <div class="relative h-64 w-full flex items-center justify-center">
+        <canvas
+          id="padelRadarChart"
+          data-serve="{{ report.radar.serve_consistency_pct }}"
+          data-net="{{ report.radar.net_control_pct }}"
+          data-overhead="{{ report.radar.overhead_power_pct }}"
+          data-backcourt="{{ report.radar.backcourt_defense_pct }}"
+          data-wall="{{ report.radar.wall_play_pct }}"
+          data-tactical="{{ report.radar.tactical_maturity_pct }}"
+        ></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Eficiência por Zona da Quadra -->
+  <div class="bg-slate-800/80 border border-slate-700 rounded-xl p-5">
+    <h3 class="text-base font-bold text-white mb-4">Eficiência por Zona Tática do Padel</h3>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div class="p-4 rounded-lg bg-slate-900/70 border border-slate-700/80">
+        <div class="flex justify-between text-sm font-semibold text-slate-200">
+          <span>1. Início de Ponto (Saque/Recepção)</span>
+          <span class="text-emerald-400">{{ report.zones.serve_return.hit_rate_pct }}%</span>
+        </div>
+        <div class="text-xs text-slate-400 mt-1">
+          {{ report.zones.serve_return.hits }} acertos em {{ report.zones.serve_return.total }} golpes ({{ report.zones.serve_return.good_decision_rate_pct }}% decisão boa)
+        </div>
+      </div>
+
+      <div class="p-4 rounded-lg bg-slate-900/70 border border-slate-700/80">
+        <div class="flex justify-between text-sm font-semibold text-slate-200">
+          <span>2. Rede & Ataque (Voleios/Smashes)</span>
+          <span class="text-emerald-400">{{ report.zones.net_attack.hit_rate_pct }}%</span>
+        </div>
+        <div class="text-xs text-slate-400 mt-1">
+          {{ report.zones.net_attack.hits }} acertos em {{ report.zones.net_attack.total }} golpes ({{ report.zones.net_attack.good_decision_rate_pct }}% decisão boa)
+        </div>
+      </div>
+
+      <div class="p-4 rounded-lg bg-slate-900/70 border border-slate-700/80">
+        <div class="flex justify-between text-sm font-semibold text-slate-200">
+          <span>3. Fundo & Vidros (Defesa/Globos)</span>
+          <span class="text-emerald-400">{{ report.zones.backcourt_glass.hit_rate_pct }}%</span>
+        </div>
+        <div class="text-xs text-slate-400 mt-1">
+          {{ report.zones.backcourt_glass.hits }} acertos em {{ report.zones.backcourt_glass.total }} golpes ({{ report.zones.backcourt_glass.good_decision_rate_pct }}% decisão boa)
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tabela de Aproveitamento por Golpe -->
+  <div class="bg-slate-800/80 border border-slate-700 rounded-xl p-5 overflow-x-auto">
+    <h3 class="text-base font-bold text-white mb-3">Detalhamento por Tipo de Golpe</h3>
+    {% if report.by_shot_type.is_empty() %}
+      <p class="text-sm text-slate-400 py-4">Nenhuma jogada registrada neste escopo.</p>
+    {% else %}
+      <table class="w-full text-left border-collapse text-sm">
+        <thead>
+          <tr class="border-b border-slate-700 text-xs uppercase text-slate-400">
+            <th class="py-2.5 px-3">Golpe</th>
+            <th class="py-2.5 px-3">Volume</th>
+            <th class="py-2.5 px-3">% Acerto</th>
+            <th class="py-2.5 px-3">% Decisão Boa</th>
+            <th class="py-2.5 px-3">Winners</th>
+            <th class="py-2.5 px-3">Erros Não Forçados</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-700/60">
+          {% for item in report.by_shot_type %}
+          <tr class="hover:bg-slate-700/30">
+            <td class="py-2.5 px-3 font-medium text-white">{{ item.shot_type.label_pt() }}</td>
+            <td class="py-2.5 px-3 text-slate-300">{{ item.total }}</td>
+            <td class="py-2.5 px-3 font-semibold text-emerald-400">{{ item.hit_rate_pct }}%</td>
+            <td class="py-2.5 px-3 text-sky-400">{{ item.good_decision_rate_pct }}%</td>
+            <td class="py-2.5 px-3 text-amber-300">{{ item.winners }}</td>
+            <td class="py-2.5 px-3 text-rose-400">{{ item.unforced_errors }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% endif %}
+  </div>
+</div>
