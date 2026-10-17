@@ -135,3 +135,17 @@ O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.
     - Defesa Anti-CSRF via Fetch Metadata (`Sec-Fetch-Site: cross-site` bloqueado com `403 Forbidden` em métodos mutáveis) e cabeçalhos `Cache-Control: no-store, no-cache, must-revalidate` e `Content-Security-Policy`.
   - **Testes Automatizados 100% em Rust:**
     - 15 testes unitários em `rust/tests/domain_validation_tests.rs` e 5 suítes de integração fim a fim em `rust/tests/api_integration_tests.rs` (**20/20 testes aprovados — 100%**).
+- **Homologação e Conclusão Completa do Fluxo OAuth2 (Fase 4.5):**
+  - **Login Social OAuth2 Ponta a Ponta (`Google/Gmail`, `Microsoft Office` e `Instagram`):**
+    - Novo endpoint público de login social `POST /api/v1/auth/oauth/{provider}/login` validando e vinculando contas pelo e-mail verificado e emitindo o token de sessão única de 12 horas (`ps_sess_...` com hash Argon2i).
+    - Defesa Anti-CSRF rigorosa com cookie HttpOnly `ps_oauth_state` (10 minutos) conferido no callback contra o parâmetro `state` (`403 Forbidden` em divergências).
+    - Atualização do endpoint de autorização `GET /api/v1/auth/oauth/{provider}/authorize` retornando `token_url`, `userinfo_url`, status de configuração de `client_secret` e emitindo o cookie `ps_oauth_state`.
+  - **Fluxo Web de Login Social com Redirecionamento Inteligente:**
+    - Handlers Web `GET /web/auth/oauth/{provider}/authorize` e `GET /web/auth/oauth/{provider}/callback`.
+    - Usuário com e-mail já cadastrado recebe o cookie de sessão de 12h `ps_session` e é redirecionado para `/web/dashboard`.
+    - Primeiro acesso (e-mail sem cadastro de CPF/WhatsApp/endereço) é redirecionado para `/web/register?email=...&oauth_provider=...` com auto-preenchimento do campo de e-mail no formulário SSR.
+  - **Documentação de Homologação e Configuração de Ambiente:**
+    - Atualização do `.env.example` com credenciais completas (`CLIENT_ID`, `CLIENT_SECRET`, `REDIRECT_URI`) e referências para os consoles oficiais (Google Cloud Console, Microsoft Entra ID e Meta for Developers).
+    - Cenário de Login Social documentado em `http/06_auth_and_oauth.http`.
+  - **Testes de Integração E2E em Rust:**
+    - Testes cobrindo validação de URLs dos provedores, integridade de cookie `ps_oauth_state`, rejeição Anti-CSRF (`403 Forbidden`), emissão de sessão única de 12h no login social e redirecionamentos Web para `/web/register` e `/web/dashboard`.

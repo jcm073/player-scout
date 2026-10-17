@@ -40,6 +40,18 @@ pub fn app_router(db: Database) -> Router {
         .route(
             "/api/v1/auth/oauth/{provider}/authorize",
             get(auth::oauth_authorize),
+        )
+        .route(
+            "/api/v1/auth/oauth/{provider}/login",
+            post(auth::oauth_login),
+        )
+        .route(
+            "/web/auth/oauth/{provider}/authorize",
+            get(web::web_oauth_authorize),
+        )
+        .route(
+            "/web/auth/oauth/{provider}/callback",
+            get(web::web_oauth_callback),
         );
 
     // Rotas protegidas por Sessão Única (12h Argon2i) + Defesa Anti-CSRF (`Sec-Fetch-Site`)

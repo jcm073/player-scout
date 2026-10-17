@@ -493,6 +493,99 @@ impl Database {
         Ok(UserOAuthAccount::from(rec))
     }
 
+    /// Autentica um usuário via provedor OAuth2 (`Google`, `Microsoft`, `Instagram`) e emite
+    /// uma sessão única de 12 horas com hash `Argon2i`:
+    /// 1. Busca vínculo existente em `user_oauth_accounts` por `(provider, provider_user_id)`.
+    /// 2. Caso não exista vínculo prévio, localiza o usuário cadastrado pelo `provider_email` normalizado
+    ///    e cria automaticamente o vínculo em `user_oauth_accounts`.
+    /// 3. Respeita eventual bloqueio ativo de força bruta (`locked_until_epoch > now`).
+    /// 4. Zera contadores de falha e emite sessão única de 12 horas (`create_or_replace_session`).
+    pub async fn authenticate_with_oauth(
+        &self,
+        provider: OAuthProvider,
+        provider_user_id: String,
+        provider_email: String,
+    ) -> Result<(User, Option<Player>, UserOAuthAccount, String, UserSession)> {
+        let normalized_email = validate_and_normalize_email(&provider_email)?;
+        let clean_provider_uid = provider_user_id.trim().to_string();
+        if clean_provider_uid.is_empty() {
+            return Err(AppError::BadRequest(
+                "O identificador do usuário no provedor OAuth2 (provider_user_id) não pode ser vazio"
+                    .to_string(),
+            ));
+        }
+
+        let mut db = self.inner.clone();
+        let existing_links = UserOAuthRecord::all().exec(&mut db).await?;
+        let matched_link = existing_links
+            .into_iter()
+            .find(|r| r.provider == provider && r.provider_user_id == clean_provider_uid);
+
+        let (mut user_rec, oauth_account) = if let Some(link_rec) = matched_link {
+            let u_rec = UserRecord::get_by_id(&mut db, &link_rec.user_id).await?;
+            (u_rec, UserOAuthAccount::from(link_rec))
+        } else {
+            let all_users = UserRecord::all().exec(&mut db).await?;
+            let Some(u_rec) = all_users
+                .into_iter()
+                .find(|u| u.email.eq_ignore_ascii_case(&normalized_email))
+            else {
+                return Err(AppError::NotFound(format!(
+                    "Nenhuma conta encontrada para o e-mail '{}'. Conclua o cadastro obrigatório (CPF, WhatsApp e endereço) antes de entrar com {}.",
+                    normalized_email,
+                    provider.display_name()
+                )));
+            };
+
+            let created_link = toasty::create!(UserOAuthRecord {
+                id: Uuid::now_v7(),
+                user_id: u_rec.id,
+                provider: provider,
+                provider_user_id: clean_provider_uid,
+                provider_email: normalized_email,
+            })
+            .exec(&mut db)
+            .await?;
+
+            (u_rec, UserOAuthAccount::from(created_link))
+        };
+
+        // Verifica se a conta está temporariamente bloqueada por força bruta
+        let now_epoch = Utc::now().timestamp();
+        let locked_until = user_rec.locked_until_epoch.unwrap_or(0);
+        if locked_until > now_epoch {
+            let remaining_secs = locked_until - now_epoch;
+            let remaining_mins = (remaining_secs + 59) / 60;
+            return Err(AppError::TooManyRequests(format!(
+                "Conta temporariamente bloqueada devido a múltiplas tentativas falhas de login. Tente novamente em {remaining_mins} minuto(s) ({remaining_secs}s)."
+            )));
+        }
+
+        if user_rec.failed_login_attempts > 0 || user_rec.locked_until_epoch.is_some() {
+            user_rec
+                .update()
+                .failed_login_attempts(0)
+                .locked_until_epoch(None)
+                .exec(&mut db)
+                .await?;
+        }
+
+        let user = User::from(user_rec);
+        let player_profile = if user.role == UserRole::Player {
+            let all_players = PlayerRecord::all().exec(&mut db).await?;
+            all_players
+                .into_iter()
+                .find(|p| p.user_id == Some(user.id))
+                .map(Player::from)
+        } else {
+            None
+        };
+
+        let (raw_token, session) = self.create_or_replace_session(user.id).await?;
+
+        Ok((user, player_profile, oauth_account, raw_token, session))
+    }
+
     pub async fn get_user_by_id(&self, user_id: Uuid) -> Result<User> {
         let mut db = self.inner.clone();
         let rec = UserRecord::get_by_id(&mut db, &user_id).await?;

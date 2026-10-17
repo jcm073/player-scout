@@ -50,6 +50,26 @@ impl OAuthProvider {
             ),
         }
     }
+
+    /// Endpoint oficial de troca do `authorization_code` por `access_token` / `id_token`
+    pub fn token_url(&self) -> &'static str {
+        match self {
+            OAuthProvider::Google => "https://oauth2.googleapis.com/token",
+            OAuthProvider::Microsoft => {
+                "https://login.microsoftonline.com/common/oauth2/v2.0/token"
+            }
+            OAuthProvider::Instagram => "https://api.instagram.com/oauth/access_token",
+        }
+    }
+
+    /// Endpoint oficial de consulta de perfil/identidade do usuário autenticado no provedor
+    pub fn userinfo_url(&self) -> &'static str {
+        match self {
+            OAuthProvider::Google => "https://openidconnect.googleapis.com/v1/userinfo",
+            OAuthProvider::Microsoft => "https://graph.microsoft.com/oidc/userinfo",
+            OAuthProvider::Instagram => "https://graph.instagram.com/me?fields=id,username",
+        }
+    }
 }
 
 /// Conta OAuth2 vinculada a um usuário (Gmail, Microsoft Office ou Instagram)
@@ -244,6 +264,10 @@ pub const ACCOUNT_LOCKOUT_SECONDS: i64 = 15 * 60;
 /// Nome do cookie HttpOnly de sessão utilizado na interface Web/HTMX
 pub const SESSION_COOKIE_NAME: &str = "ps_session";
 
+/// Nome do cookie HttpOnly de validação Anti-CSRF (`state`) durante o fluxo OAuth2 (validade: 10 minutos)
+pub const OAUTH_STATE_COOKIE_NAME: &str = "ps_oauth_state";
+pub const OAUTH_STATE_TTL_SECONDS: i64 = 600;
+
 /// Representa a sessão ativa única de um usuário autenticado (validade de 12 horas)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UserSession {
@@ -403,6 +427,22 @@ pub fn extract_session_token_from_cookie(cookie_header: &str) -> Option<String> 
             let token = value.trim();
             if !token.is_empty() {
                 return Some(token.to_string());
+            }
+        }
+    }
+    None
+}
+
+/// Extrai o estado Anti-CSRF `ps_oauth_state` de um cabeçalho HTTP `Cookie`
+pub fn extract_oauth_state_from_cookie(cookie_header: &str) -> Option<String> {
+    for part in cookie_header.split(';') {
+        let trimmed = part.trim();
+        if let Some((name, value)) = trimmed.split_once('=')
+            && name.trim() == OAUTH_STATE_COOKIE_NAME
+        {
+            let state = value.trim();
+            if !state.is_empty() {
+                return Some(state.to_string());
             }
         }
     }

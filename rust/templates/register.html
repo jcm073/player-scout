@@ -497,6 +497,18 @@
       errBox.classList.add('hidden');
       return true;
     }
+
+    // Pré-preenche o e-mail caso o usuário tenha vindo do fluxo de primeiro acesso OAuth2
+    (function prefillFromOAuthQuery() {
+      const params = new URLSearchParams(window.location.search);
+      const email = params.get('email');
+      if (email) {
+        const emailInput = document.getElementById('reg-email');
+        if (emailInput) {
+          emailInput.value = email;
+        }
+      }
+    })();
   </script>
 </body>
 </html>
