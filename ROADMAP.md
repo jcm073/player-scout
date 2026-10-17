@@ -54,17 +54,23 @@ Este arquivo é a fonte oficial do estado de evolução do projeto. Toda fase e 
   - `CHECK (set_number >= 1 AND set_number <= 5)`
   - Padrão `good` para qualidade de decisão.
 - [x] Criação dos índices compostos para agregação rápida por partida/set e por range de datas do jogador.
-- [~] Configuração e mapeamento das entidades usando o ORM **Toasty** (`tokio-rs/toasty`) no backend Rust. 📍 **ETAPA ATUAL**
+- [x] Migração `002_user_roles.sql`: Criação da tabela `users` com perfis `admin` e `coach`.
+- [x] Migração `003_player_role_and_multi_coach.sql`: Perfil `player` (read-only), `user_id` em `players` e tabela `coach_players` (N:N múltiplos treinadores).
+- [ ] Configuração e mapeamento das entidades usando o ORM **Toasty** (`tokio-rs/toasty`) no backend Rust.
 
 ---
 
 ### Fase 2: Backend em Rust (`/rust`) com Axum
-- [ ] Criação do workspace Cargo em `/rust` (Rust Edition 2024, toolchain 1.99.x+).
-- [ ] Configuração das dependências centrais: `axum`, `tokio`, `toasty`, `serde`, `tracing`, `validator`.
-- [ ] Implementação dos tipos de domínio fortemente tipados:
-  - Enums para `ShotType`, `ShotOutcome`, `DecisionQuality`, `SpecialTag`.
+- [x] Criação do workspace Cargo em `/rust` (Rust Edition 2024, toolchain 1.99.x+).
+- [x] Configuração das dependências centrais: `axum` (v0.8+), `toasty` (v0.11+), `askama` (v0.16+), `tokio`, `serde`, `tracing`, `thiserror`.
+- [x] Implementação dos tipos de domínio fortemente tipados:
+  - Enums para `ShotType` (21 golpes), `ShotOutcome`, `DecisionQuality`, `SpecialTag`.
+  - Perfis de usuário `UserRole` (`Admin`, `Coach`, `Player`) com permissões (`can_write_shots`, `is_read_only`).
+  - Entidades `Player`, `CoachPlayer` (relação N:N), `MatchSession`.
+  - 8 testes unitários de regras esportivas com 100% de aprovação.
+- [~] Configuração do Toasty ORM e pool de conexão com PostgreSQL 18. 📍 **ETAPA ATUAL**
 - [ ] Endpoints REST de Gestão:
-  - `POST /api/v1/coaches` / Autenticação
+  - `POST /api/v1/users` / Autenticação
   - `POST /api/v1/players` / `GET /api/v1/players`
   - `POST /api/v1/matches` / `GET /api/v1/matches/{id}`
 - [ ] Endpoints de Registro em Quadra (Baixa Latência):

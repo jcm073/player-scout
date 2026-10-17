@@ -1,0 +1,42 @@
+[package]
+name = "player-scout"
+version = "0.1.0"
+edition = "2024"
+authors = ["jcm073 <jcmartinshg@gmail.com>"]
+description = "Scouting, estatísticas avançadas e análise tática para esportes de raquete (Padel)"
+
+[lib]
+name = "player_scout"
+path = "src/lib.rs"
+
+[[bin]]
+name = "player-scout"
+path = "src/main.rs"
+
+[dependencies]
+# Servidor HTTP & Roteamento (versão estável mais recente)
+axum = { version = "0.8.9", features = ["macros"] }
+tokio = { version = "1.43", features = ["full"] }
+tower = { version = "0.5", features = ["util"] }
+tower-http = { version = "0.6", features = ["cors", "trace", "fs"] }
+
+# ORM Assíncrono Tokio para PostgreSQL
+toasty = { version = "0.11.0", features = ["postgresql"] }
+
+# Templates HTML Type-Safe Compilados (v0.16+)
+askama = { version = "0.16.1" }
+
+# Serialização, Tipagem & Erros
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "2.0"
+uuid = { version = "1.13", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+
+# Logs, Rastreamento & Variáveis de Ambiente
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+dotenvy = "0.15"
+
+[dev-dependencies]
+tokio-test = "0.4"
