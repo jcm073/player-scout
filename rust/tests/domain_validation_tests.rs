@@ -256,3 +256,175 @@ fn test_21_padel_shots_categorization() {
         assert!(!shot.is_net_or_attack());
     }
 }
+
+#[test]
+fn test_empty_analytics_report_has_zero_safe_values() {
+    let player_id = Uuid::now_v7();
+    let report = PlayerAnalyticsReport::from_events(player_id, AnalyticsFilter::default(), &[]);
+
+    assert_eq!(report.total_shots, 0);
+    assert_eq!(report.hit_rate_pct, 0.0);
+    assert_eq!(report.good_decision_rate_pct, 0.0);
+    assert_eq!(report.winner_to_ue_balance, 0);
+    assert_eq!(report.matrix.hit_good, 0);
+    assert_eq!(report.radar.tactical_maturity_pct, 0.0);
+    assert!(report.by_shot_type.is_empty());
+}
+
+#[test]
+fn test_matrix_and_radar_analytics_calculation() {
+    let match_id = Uuid::now_v7();
+    let player_id = Uuid::now_v7();
+
+    let events = vec![
+        // 1. Hit + Good (Jogada Ideal) - Saque
+        ShotEvent::new(
+            match_id,
+            player_id,
+            1,
+            ShotType::Saque,
+            ShotOutcome::Hit,
+            Some(DecisionQuality::Good),
+            None,
+        )
+        .unwrap(),
+        // 2. Hit + Bad (Compensação/Sorte) - VoleioDireita + Winner
+        ShotEvent::new(
+            match_id,
+            player_id,
+            1,
+            ShotType::VoleioDireita,
+            ShotOutcome::Hit,
+            Some(DecisionQuality::Bad),
+            Some(SpecialTag::Winner),
+        )
+        .unwrap(),
+        // 3. Miss + Good (Erro Técnico) - Bandeja + UnforcedError
+        ShotEvent::new(
+            match_id,
+            player_id,
+            1,
+            ShotType::Bandeja,
+            ShotOutcome::Miss,
+            Some(DecisionQuality::Good),
+            Some(SpecialTag::UnforcedError),
+        )
+        .unwrap(),
+        // 4. Miss + Bad (Erro Tático Grave) - BajadaParede + UnforcedError
+        ShotEvent::new(
+            match_id,
+            player_id,
+            1,
+            ShotType::BajadaParede,
+            ShotOutcome::Miss,
+            Some(DecisionQuality::Bad),
+            Some(SpecialTag::UnforcedError),
+        )
+        .unwrap(),
+    ];
+
+    let report = PlayerAnalyticsReport::from_events(player_id, AnalyticsFilter::default(), &events);
+
+    assert_eq!(report.total_shots, 4);
+    assert_eq!(report.hits, 2);
+    assert_eq!(report.misses, 2);
+    assert_eq!(report.hit_rate_pct, 50.0);
+    assert_eq!(report.good_decisions, 2);
+    assert_eq!(report.bad_decisions, 2);
+    assert_eq!(report.good_decision_rate_pct, 50.0);
+    assert_eq!(report.winners, 1);
+    assert_eq!(report.unforced_errors, 2);
+    assert_eq!(report.winner_to_ue_balance, -1);
+
+    // 4 quadrantes da Matriz Decisão × Execução (1 em cada quadrante = 25% cada)
+    assert_eq!(report.matrix.hit_good, 1);
+    assert_eq!(report.matrix.hit_good_pct, 25.0);
+    assert_eq!(report.matrix.hit_bad, 1);
+    assert_eq!(report.matrix.hit_bad_pct, 25.0);
+    assert_eq!(report.matrix.miss_good, 1);
+    assert_eq!(report.matrix.miss_good_pct, 25.0);
+    assert_eq!(report.matrix.miss_bad, 1);
+    assert_eq!(report.matrix.miss_bad_pct, 25.0);
+
+    // Zonas & Radar
+    assert_eq!(report.zones.serve_return.hit_rate_pct, 100.0);
+    assert_eq!(report.zones.net_attack.hit_rate_pct, 50.0);
+    assert_eq!(report.zones.backcourt_glass.hit_rate_pct, 0.0);
+    assert_eq!(report.radar.serve_consistency_pct, 100.0);
+    assert_eq!(report.radar.net_control_pct, 100.0);
+    assert_eq!(report.radar.overhead_power_pct, 0.0);
+    assert_eq!(report.radar.wall_play_pct, 0.0);
+    assert_eq!(report.radar.tactical_maturity_pct, 50.0);
+}
+
+#[test]
+fn test_analytics_comparison_deltas_set1_vs_set2() {
+    let match_id = Uuid::now_v7();
+    let player_id = Uuid::now_v7();
+
+    let events = vec![
+        // Set 1: 1 acerto e 1 erro (50% hit rate, 50% good decision, 0 W, 1 UE => saldo -1)
+        ShotEvent::new(
+            match_id,
+            player_id,
+            1,
+            ShotType::Vibora,
+            ShotOutcome::Hit,
+            Some(DecisionQuality::Good),
+            None,
+        )
+        .unwrap(),
+        ShotEvent::new(
+            match_id,
+            player_id,
+            1,
+            ShotType::Vibora,
+            ShotOutcome::Miss,
+            Some(DecisionQuality::Bad),
+            Some(SpecialTag::UnforcedError),
+        )
+        .unwrap(),
+        // Set 2: 2 acertos e 0 erros (100% hit rate, 100% good decision, 1 W, 0 UE => saldo +1)
+        ShotEvent::new(
+            match_id,
+            player_id,
+            2,
+            ShotType::Vibora,
+            ShotOutcome::Hit,
+            Some(DecisionQuality::Good),
+            Some(SpecialTag::Winner),
+        )
+        .unwrap(),
+        ShotEvent::new(
+            match_id,
+            player_id,
+            2,
+            ShotType::SmashX3,
+            ShotOutcome::Hit,
+            Some(DecisionQuality::Good),
+            None,
+        )
+        .unwrap(),
+    ];
+
+    let scope_a = AnalyticsFilter {
+        match_id: Some(match_id),
+        set_number: Some(1),
+        ..Default::default()
+    };
+    let scope_b = AnalyticsFilter {
+        match_id: Some(match_id),
+        set_number: Some(2),
+        ..Default::default()
+    };
+
+    let report_a = PlayerAnalyticsReport::from_events(player_id, scope_a, &events);
+    let report_b = PlayerAnalyticsReport::from_events(player_id, scope_b, &events);
+    let comparison = AnalyticsComparisonReport::compare(report_a, report_b);
+
+    assert_eq!(comparison.deltas.hit_rate_delta_pct, 50.0); // 100% - 50% = +50%
+    assert_eq!(comparison.deltas.good_decision_rate_delta_pct, 50.0); // 100% - 50% = +50%
+    assert_eq!(comparison.deltas.winner_to_ue_balance_delta, 2); // +1 - (-1) = +2
+    assert_eq!(comparison.deltas.winners_delta, 1);
+    assert_eq!(comparison.deltas.unforced_errors_delta, -1);
+}

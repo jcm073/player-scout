@@ -169,3 +169,51 @@ Content-Type: application/json
 # @name listMatchShots
 GET {{baseUrl}}/matches/{{createMatch.response.body.id}}/shots?actor_id={{createAthleteUser.response.body.id}}
 Accept: application/json
+
+###
+
+### Passo 14: Registrar Jogada no Set 2 — Voleio Direita Winner
+# @name shotSet2
+POST {{baseUrl}}/matches/{{createMatch.response.body.id}}/shots
+Content-Type: application/json
+
+{
+  "actor_id": "{{createCoachTactical.response.body.id}}",
+  "player_id": "{{createPlayerProfile.response.body.id}}",
+  "set_number": 2,
+  "shot_type": "voleio_direita",
+  "outcome": "hit",
+  "decision": "good",
+  "special_tag": "winner"
+}
+
+###
+
+### Passo 15: Consultar Relatório Analítico Recursivo da Partida (Matriz 4 Quadrantes + Radar 6 Fases)
+# @name getPlayerAnalytics
+GET {{baseUrl}}/analytics/players/{{createPlayerProfile.response.body.id}}?actor_id={{createAthleteUser.response.body.id}}&match_id={{createMatch.response.body.id}}
+Accept: application/json
+
+###
+
+### Passo 16: Modo Comparativo Lado a Lado — Set 1 vs Set 2
+# @name compareSet1VsSet2
+POST {{baseUrl}}/analytics/compare
+Content-Type: application/json
+
+{
+  "actor_id": "{{createAthleteUser.response.body.id}}",
+  "player_id": "{{createPlayerProfile.response.body.id}}",
+  "scope_a": {
+    "match_id": "{{createMatch.response.body.id}}",
+    "set_number": 1,
+    "from_date": null,
+    "to_date": null
+  },
+  "scope_b": {
+    "match_id": "{{createMatch.response.body.id}}",
+    "set_number": 2,
+    "from_date": null,
+    "to_date": null
+  }
+}

@@ -11,10 +11,10 @@ Este arquivo é a fonte oficial do estado de evolução do projeto. Toda fase e 
 | **Fase 0** | Definições de Domínio, Wireframes & Documentação | **Concluído** | 100% |
 | **Fase 1** | Banco de Dados PostgreSQL 18+ & Modelagem com Toasty ORM | **Concluído** | 100% |
 | **Fase 2** | Backend Rust (Axum, API REST & Ingestão em Quadra) | **Concluído** | 100% |
-| **Fase 3** | Motor Analítico, Agregação Recursiva & Modo Comparativo | **Em Andamento** | 0% |
-| **Fase 4** | Frontend Web (Askama, HTMX 4.x, Chart.js & Mobile Touch) | **Pendente** | 0% |
+| **Fase 3** | Motor Analítico, Agregação Recursiva & Modo Comparativo | **Concluído** | 100% |
+| **Fase 4** | Frontend Web (Askama, HTMX 4.x, Chart.js & Mobile Touch) | **Em Andamento** | 0% |
 | **Fase 5** | Clientes Móveis (Kotlin / KMP para Android e iOS) | **Pendente** | 0% |
-| **Fase 6** | Testes Automatizados 100% em Rust, CI/CD & Auditoria | **Em Andamento** | 50% |
+| **Fase 6** | Testes Automatizados 100% em Rust, CI/CD & Auditoria | **Em Andamento** | 70% |
 
 > **Legenda de Status:**
 > - `[x]` Concluído
@@ -81,22 +81,22 @@ Este arquivo é a fonte oficial do estado de evolução do projeto. Toda fase e 
 ---
 
 ### Fase 3: Motor Analítico & Modo Comparativo
-- [~] Implementação de queries agregadas e métricas recursivas: 📍 **ETAPA ATUAL**
+- [x] Implementação de queries agregadas e métricas recursivas (`src/domain/analytics.rs`):
   - Taxa geral de acerto (% In vs % Out).
   - Qualidade de decisão (% Boa vs % Ruim).
   - Saldo W/UE (`Winners` vs `Erros Não Forçados`).
-  - Matriz Decisão × Execução (4 quadrantes).
+  - Matriz Decisão × Execução (4 quadrantes: `hit_good`, `hit_bad`, `miss_good`, `miss_bad`).
   - Eficiência por zona (Início, Rede/Ataque, Fundo/Vidros).
   - Radar de habilidades (6 fases do Padel).
-- [ ] Endpoint de Agregação Recursiva:
+- [x] Endpoint de Agregação Recursiva (`src/api/analytics.rs`):
   - `GET /api/v1/analytics/players/{id}` com filtros flexíveis por período ou escopo (`match_id`, `set_number`, range de datas).
-- [ ] Endpoint de Comparação Lado a Lado:
+- [x] Endpoint de Comparação Lado a Lado (`src/api/analytics.rs`):
   - `POST /api/v1/analytics/compare` recebendo Escopo A e Escopo B (ex: Set 1 vs Set 2, ou Mês 1 vs Mês 2) e retornando métricas pareadas e deltas (▲/▼).
 
 ---
 
 ### Fase 4: Frontend Web (Askama, HTMX 4.x & Chart.js)
-- [ ] Configuração de templates server-side compilados com **Askama**.
+- [~] Configuração de templates server-side compilados com **Askama**. 📍 **ETAPA ATUAL**
 - [ ] Integração com **HTMX 4.x** para interações dinâmicas sem SPAs pesadas.
 - [ ] Interface do Treinador em Quadra (Touch-First):
   - Layout responsivo para celular e tablet.
@@ -126,7 +126,7 @@ Este arquivo é a fonte oficial do estado de evolução do projeto. Toda fase e 
 ### Fase 6: Testes Automatizados (100% em Rust) & Auditoria
 - [x] Testes unitários em Rust para validações de regras de negócio esportivas.
 - [x] Testes de integração em Rust contra o PostgreSQL 18+ (validando persistência, constraints e queries do Toasty).
-- [ ] Testes em Rust para cálculos matemáticos analíticos e deltas do comparativo.
+- [x] Testes em Rust para cálculos matemáticos analíticos e deltas do comparativo.
 - [ ] Testes de contrato de interface Web (validando respostas HTMX e Askama).
 - [x] Pipeline de validação estática: `cargo fmt --check`, `cargo clippy -- -D warnings`.
 - [ ] Auditoria de segurança de dependências com `cargo audit`.

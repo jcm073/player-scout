@@ -1,8 +1,10 @@
+pub mod analytics;
 pub mod match_session;
 pub mod player;
 pub mod shot;
 pub mod user;
 
+pub use analytics::*;
 pub use match_session::*;
 pub use player::*;
 pub use shot::*;
