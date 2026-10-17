@@ -51,3 +51,13 @@ O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.
     - Índices compostos de alta performance para o motor analítico e dashboards recursivos.
   - Segurança de credenciais: remoção de fallbacks hardcoded no `docker-compose.yml` com uso da sintaxe de validação `${VAR:?msg}` e garantia de exclusão do `.env` no `.gitignore`.
   - Validação prática com 100% de aprovação na criação de tabelas, enums, execução de constraints e funcionamento do MCP.
+- **Modelagem Relacional Avançada (Perfis & Relação N:N):**
+  - Migração `migrations/002_user_roles.sql`: Tabela `users` com `role user_role_enum` (`admin` e `coach`).
+  - Migração `migrations/003_player_role_and_multi_coach.sql`: Perfil `player` (read-only), adição de `user_id` em `players` e criação da tabela associativa `coach_players` permitindo múltiplos treinadores por jogador.
+- **Backend Rust & Camada de Domínio (Fase 2):**
+  - Inicialização do workspace Cargo em `/rust` (Rust Edition 2024, toolchain 1.99.1).
+  - Dependências configuradas nas versões mais recentes: `axum` (0.8.9), `toasty` (0.11.0 com postgresql), `askama` (0.16.1), `tokio` (1.43), `thiserror` (2.0), `uuid`, `chrono`, `tower-http`.
+  - Módulos de domínio tipados: `domain::user` (`Admin`, `Coach`, `Player`), `domain::shot` (21 golpes do Padel, `ShotOutcome`, `DecisionQuality`, `SpecialTag`), `domain::player` (`Player`, `CoachPlayer`), `domain::match_session`.
+  - Tratamento de erros centralizado (`error::AppError` implementando `IntoResponse` do Axum) e configuração de ambiente (`config::AppConfig`).
+  - Router Axum e endpoint de health check (`/health` e `/api/v1/health`).
+  - Suíte de 8 testes unitários automatizados em Rust com 100% de aprovação e validação estrita com `cargo fmt` e `cargo clippy`.
