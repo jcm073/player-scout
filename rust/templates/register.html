@@ -17,7 +17,7 @@
         </div>
         <div>
           <h1 class="text-xl font-extrabold text-white">Cadastro Completo · Player &amp; Coach</h1>
-          <p class="text-xs text-slate-400">Chaves de Identificação: CPF e E-mail · Hash Criptográfico Argon2i</p>
+          <p class="text-xs text-slate-400">Chaves de Identificação: CPF e E-mail · Criptografia Avançada</p>
         </div>
       </div>
       <div class="flex items-center gap-2">
@@ -289,21 +289,32 @@
         </div>
       </div>
 
-      <!-- 4. Senha Forte com Hash Argon2i e Checklist em Tempo Real -->
-      <div class="space-y-3">
-        <h2 class="text-xs font-extrabold uppercase tracking-wider text-emerald-400">4. Segurança &amp; Senha (Argon2i)</h2>
+      <!-- 4. Senha Forte e Checklist em Tempo Real -->
+      <div class="space-y-4">
+        <h2 class="text-xs font-extrabold uppercase tracking-wider text-emerald-400">4. Segurança &amp; Senha Forte</h2>
+        
         <div>
           <label class="block text-xs font-bold text-slate-300 mb-1" for="reg-password">Senha *</label>
-          <input
-            id="reg-password"
-            type="password"
-            name="password"
-            required
-            minlength="12"
-            placeholder="Mínimo de 12 caracteres (1 maiúscula, 1 minúscula, 1 número e 1 especial)"
-            oninput="onPasswordInput(this)"
-            class="w-full min-h-[48px] px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-sm text-white focus:border-emerald-400 focus:outline-none"
-          />
+          <div class="relative">
+            <input
+              id="reg-password"
+              type="password"
+              name="password"
+              required
+              minlength="12"
+              placeholder="Mínimo de 12 caracteres (1 maiúscula, 1 minúscula, 1 número e 1 especial)"
+              oninput="onPasswordInput(this)"
+              class="w-full min-h-[48px] pl-3.5 pr-12 py-2 rounded-xl bg-slate-950 border border-slate-700 text-sm text-white focus:border-emerald-400 focus:outline-none"
+            />
+            <button
+              type="button"
+              onclick="togglePasswordVisibility('reg-password', this)"
+              title="Mostrar ou ocultar senha"
+              class="absolute right-2.5 top-1/2 -translate-y-1/2 p-2 text-slate-400 hover:text-slate-200 transition focus:outline-none text-base"
+            >
+              👁️
+            </button>
+          </div>
 
           <!-- Indicadores Visuais da Política de Senha no Front-End -->
           <div class="grid grid-cols-2 sm:grid-cols-5 gap-2 mt-2.5 text-[11px] font-semibold">
@@ -322,6 +333,33 @@
             <div id="pw-rule-special" class="px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-slate-400">
               ○ 1 Especial (!@#$)
             </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="flex items-center justify-between mb-1">
+            <label class="text-xs font-bold text-slate-300" for="reg-confirm-password">Confirme sua Senha *</label>
+            <span id="confirm-password-status" class="text-[11px] font-semibold text-slate-400">Digite novamente</span>
+          </div>
+          <div class="relative">
+            <input
+              id="reg-confirm-password"
+              type="password"
+              name="confirm_password"
+              required
+              minlength="12"
+              placeholder="Digite a mesma senha para confirmação"
+              oninput="onConfirmPasswordInput(this)"
+              class="w-full min-h-[48px] pl-3.5 pr-12 py-2 rounded-xl bg-slate-950 border border-slate-700 text-sm text-white focus:border-emerald-400 focus:outline-none"
+            />
+            <button
+              type="button"
+              onclick="togglePasswordVisibility('reg-confirm-password', this)"
+              title="Mostrar ou ocultar confirmação de senha"
+              class="absolute right-2.5 top-1/2 -translate-y-1/2 p-2 text-slate-400 hover:text-slate-200 transition focus:outline-none text-base"
+            >
+              👁️
+            </button>
           </div>
         </div>
       </div>
@@ -453,7 +491,19 @@
       }
     }
 
-    // Validação em tempo real dos 5 requisitos da senha Argon2i
+    function togglePasswordVisibility(inputId, btn) {
+      const input = document.getElementById(inputId);
+      if (!input) return;
+      if (input.type === 'password') {
+        input.type = 'text';
+        btn.textContent = '🙈';
+      } else {
+        input.type = 'password';
+        btn.textContent = '👁️';
+      }
+    }
+
+    // Validação em tempo real dos 5 requisitos da senha
     function onPasswordInput(input) {
       const pw = input.value;
       const hasLen = pw.length >= 12;
@@ -473,6 +523,32 @@
       } else {
         input.setCustomValidity('A senha deve ter no mínimo 12 caracteres, 1 maiúscula, 1 minúscula, 1 número e 1 caractere especial.');
       }
+
+      const confirmEl = document.getElementById('reg-confirm-password');
+      if (confirmEl && confirmEl.value) {
+        onConfirmPasswordInput(confirmEl);
+      }
+    }
+
+    function onConfirmPasswordInput(input) {
+      const pwInput = document.getElementById('reg-password');
+      const pw = pwInput ? pwInput.value : '';
+      const confirmPw = input.value;
+      const statusEl = document.getElementById('confirm-password-status');
+
+      if (!confirmPw) {
+        statusEl.textContent = 'Digite novamente';
+        statusEl.className = 'text-[11px] font-semibold text-slate-400';
+        input.setCustomValidity('Confirme a sua senha.');
+      } else if (pw === confirmPw) {
+        statusEl.textContent = '✓ Senhas conferem';
+        statusEl.className = 'text-[11px] font-bold text-emerald-400';
+        input.setCustomValidity('');
+      } else {
+        statusEl.textContent = '✗ Senhas não conferem';
+        statusEl.className = 'text-[11px] font-bold text-rose-400';
+        input.setCustomValidity('A confirmação deve ser exatamente igual à senha digitada.');
+      }
     }
 
     function validateRegistrationForm(event) {
@@ -480,15 +556,19 @@
       const cpfInput = document.getElementById('reg-cpf');
       const compInput = document.getElementById('reg-complement');
       const pwInput = document.getElementById('reg-password');
+      const confirmInput = document.getElementById('reg-confirm-password');
 
       onCpfInput(cpfInput);
       onComplementInput(compInput);
       onPasswordInput(pwInput);
+      onConfirmPasswordInput(confirmInput);
 
       const form = document.getElementById('register-form');
-      if (!form.checkValidity()) {
+      if (!form.checkValidity() || pwInput.value !== confirmInput.value) {
         event.preventDefault();
-        errBox.textContent = '⚠️ Verifique os campos destacados antes de concluir o cadastro.';
+        errBox.textContent = pwInput.value !== confirmInput.value
+          ? '⚠️ A senha e a confirmação de senha não conferem. Verifique os campos digitados.'
+          : '⚠️ Verifique os campos destacados antes de concluir o cadastro.';
         errBox.classList.remove('hidden');
         form.reportValidity();
         return false;

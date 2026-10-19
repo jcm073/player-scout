@@ -46,6 +46,7 @@ pub struct UserRecord {
     pub password_hash: String,
     pub failed_login_attempts: u8,
     pub locked_until_epoch: Option<i64>,
+    pub is_active: bool,
 }
 
 impl From<UserRecord> for User {
@@ -70,6 +71,7 @@ impl From<UserRecord> for User {
             state: rec.state,
             preferred_side: rec.preferred_side,
             password_hash: rec.password_hash,
+            is_active: rec.is_active,
             created_at: ts,
             updated_at: ts,
         }

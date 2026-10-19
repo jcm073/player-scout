@@ -11,6 +11,25 @@ O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.
 ## [Não lançado] - Unreleased
 
 ### Adicionado
+- **Redirecionamento Automático Pós-Login para o Dashboard:**
+  - Emissão do cabeçalho `HX-Redirect` e script inline de redirecionamento no endpoint `POST /web/partials/auth/login`, conduzindo o usuário instantaneamente para o dashboard analítico ao autenticar.
+- **Blindagem e Reestruturação Completa do Layout do Dashboard Analítico:**
+  - Resolução automática do atleta vinculado ao usuário autenticado (`Player`, `Coach` ou `Admin`), eliminando referências a UUIDs nulos ou títulos de demonstração no drill-down.
+  - Topbar autenticada limpa e responsiva: remoção de links desnecessários de login/cadastro, inclusão de badges de perfil do usuário e atalhos contextuais.
+  - Seletor integrado de partidas e atletas para navegação fluida em múltiplos escopos de análise.
+  - Correção e contenção no container do Chart.js do Radar de Habilidades (6 Fases do Padel), garantindo responsividade touch-first sem quebra ou colapso de canvas.
+  - Tratamento elegante para novos atletas e escopos sem jogadas computadas.
+- **Desativação Lógica de Usuários e Treinadores (Soft Delete):**
+  - Coluna `is_active BOOLEAN NOT NULL DEFAULT true` e índice na tabela `users` (Migração 006).
+  - Métodos `deactivate_user` e `reactivate_user` no repositório com revogação imediata de sessões ativas.
+  - Endpoints REST `DELETE /api/v1/users/{id}` e `POST /api/v1/users/{id}/reactivate` com proteção RBAC/LGPD.
+  - Bloqueio de login (`403 Forbidden`) para contas desativadas no fluxo por e-mail e OAuth2.
+- **Melhorias de Usabilidade e Segurança nos Formulários de Autenticação:**
+  - Campo obrigatório de Confirmação de Senha no cadastro (`register.html`) com validação visual em tempo real.
+  - Botão de alternância para Mostrar/Ocultar Senha (👁️) nas telas de login e cadastro.
+  - Remoção de exposição de detalhes técnicos da criptografia (*Argon2i*) nas páginas públicas HTML (OWASP Information Disclosure).
+- **Ajuste no Fluxo Pós-Cadastro:**
+  - O cadastro web passa a direcionar o usuário explicitamente para a tela de login (`/web/login`), sem emitir cookie de sessão preliminar.
 - **Definições de Domínio do Padel:**
   - Catálogo de 21 jogadas agrupadas em três zonas táticas:
     - *Início de Ponto:* Saque e Recepção.

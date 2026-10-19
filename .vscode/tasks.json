@@ -1,0 +1,17 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Player Scout: iniciar API Rust",
+			"type": "shell",
+			"command": "cargo",
+			"args": [
+				"run",
+				"--manifest-path",
+				"rust/Cargo.toml"
+			],
+			"isBackground": true,
+			"problemMatcher": []
+		}
+	]
+}

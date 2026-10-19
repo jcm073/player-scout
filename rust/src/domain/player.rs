@@ -24,6 +24,14 @@ pub enum PreferredSide {
 }
 
 impl PreferredSide {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            PreferredSide::Left => "left",
+            PreferredSide::Right => "right",
+            PreferredSide::Both => "both",
+        }
+    }
+
     pub fn label_pt(&self) -> &'static str {
         match self {
             PreferredSide::Left => "Esquerda (Revés)",

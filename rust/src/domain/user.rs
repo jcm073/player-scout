@@ -67,8 +67,14 @@ pub struct User {
     pub preferred_side: PreferredSide,
     #[serde(skip_serializing, default)]
     pub password_hash: String,
+    #[serde(default = "default_active")]
+    pub is_active: bool,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+}
+
+fn default_active() -> bool {
+    true
 }
 
 impl User {
@@ -97,6 +103,7 @@ impl User {
             state: None,
             preferred_side: PreferredSide::Left,
             password_hash: password_hash.into(),
+            is_active: true,
             created_at: now,
             updated_at: now,
         }
@@ -127,6 +134,7 @@ impl User {
             state: None,
             preferred_side: PreferredSide::Left,
             password_hash: password_hash.into(),
+            is_active: true,
             created_at: now,
             updated_at: now,
         }
@@ -157,6 +165,7 @@ impl User {
             state: None,
             preferred_side: PreferredSide::Left,
             password_hash: password_hash.into(),
+            is_active: true,
             created_at: now,
             updated_at: now,
         }

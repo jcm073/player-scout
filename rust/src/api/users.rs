@@ -79,3 +79,43 @@ pub async fn list_users(
     let users = db.list_users().await?;
     Ok(Json(users))
 }
+
+/// Desativa logicamente a conta de um usuário (Soft Delete) (`DELETE /api/v1/users/{id}`)
+/// - Proteção RBAC / BOLA / LGPD:
+///   - Um `Player` só pode desativar a sua própria conta (`id == auth_user.user.id`)
+///   - Um `Coach` pode desativar atletas ou a si próprio
+///   - Um `Admin` pode desativar qualquer usuário
+pub async fn deactivate_user(
+    State(db): State<Database>,
+    Extension(auth_user): Extension<AuthenticatedUser>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<User>> {
+    if auth_user.user.role == UserRole::Player && id != auth_user.user.id {
+        return Err(AppError::Forbidden(
+            "Violação de controle de acesso (BOLA): um atleta só pode desativar o seu próprio perfil"
+                .to_string(),
+        ));
+    }
+
+    let target_user = db.get_user_by_id(id).await?;
+    if target_user.role == UserRole::Admin && !auth_user.user.role.is_admin() {
+        return Err(AppError::Forbidden(
+            "Apenas administradores podem desativar contas com perfil Admin".to_string(),
+        ));
+    }
+
+    let deactivated = db.deactivate_user(id).await?;
+    Ok(Json(deactivated))
+}
+
+/// Reativa logicamente uma conta desativada (`POST /api/v1/users/{id}/reactivate`)
+/// - Restrito a Administradores (Admin) e Treinadores (Coach)
+pub async fn reactivate_user(
+    State(db): State<Database>,
+    Extension(auth_user): Extension<AuthenticatedUser>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<User>> {
+    auth_user.require_coach_or_admin()?;
+    let reactivated = db.reactivate_user(id).await?;
+    Ok(Json(reactivated))
+}

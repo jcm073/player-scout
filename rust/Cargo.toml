@@ -44,3 +44,9 @@ dotenvy = "0.15"
 
 [dev-dependencies]
 tokio-test = "0.4"
+
+[profile.dev]
+# Reduz o nível de símbolos de debug para apenas números de linha, acelerando I/O e linkagem
+debug = 1
+# Divide as informações de debug no Linux, acelerando a recriação do binário
+split-debuginfo = "unpacked"

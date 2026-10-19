@@ -16,15 +16,21 @@
       </div>
       <div>
         <h1 class="text-xl font-extrabold text-white">Player Scout <span class="text-xs font-semibold px-2 py-0.5 ml-1 rounded bg-emerald-900/70 text-emerald-300">PADEL</span></h1>
-        <p class="text-xs text-slate-400">Acesso exclusivo por E-mail · Segurança Argon2i</p>
+        <p class="text-xs text-slate-400">Acesso exclusivo por E-mail · Conexão Segura</p>
       </div>
     </div>
 
+    <!-- Mensagem de Erro de Login (se houver) -->
+    {% if let Some(err) = error %}
+    <div class="p-4 rounded-xl bg-rose-950/80 border border-rose-700 text-rose-200 text-xs font-semibold">
+      ❌ {{ err }}
+    </div>
+    {% endif %}
+
     <!-- Formulário de Login por E-mail -->
     <form
-      hx-post="/web/partials/auth/login"
-      hx-target="#auth-feedback"
-      hx-swap="innerHTML"
+      action="/web/login"
+      method="POST"
       class="space-y-4"
     >
       <div>
@@ -41,27 +47,34 @@
 
       <div>
         <label class="block text-xs font-bold uppercase text-slate-300 mb-1.5" for="login-password">Senha (12+ caracteres)</label>
-        <input
-          id="login-password"
-          type="password"
-          name="password"
-          required
-          minlength="12"
-          placeholder="••••••••••••"
-          class="w-full min-h-[48px] px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-sm text-white focus:border-emerald-400 focus:outline-none"
-        />
+        <div class="relative">
+          <input
+            id="login-password"
+            type="password"
+            name="password"
+            required
+            minlength="12"
+            placeholder="••••••••••••"
+            class="w-full min-h-[48px] pl-3.5 pr-12 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-sm text-white focus:border-emerald-400 focus:outline-none"
+          />
+          <button
+            type="button"
+            onclick="togglePasswordVisibility('login-password', this)"
+            title="Mostrar ou ocultar senha"
+            class="absolute right-2.5 top-1/2 -translate-y-1/2 p-2 text-slate-400 hover:text-slate-200 transition focus:outline-none text-base"
+          >
+            👁️
+          </button>
+        </div>
       </div>
 
       <button
         type="submit"
-        class="w-full min-h-[52px] rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-extrabold text-sm tracking-wide transition"
+        class="w-full min-h-[52px] rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-extrabold text-sm tracking-wide transition cursor-pointer"
       >
         Entrar com E-mail
       </button>
     </form>
-
-    <!-- Feedback HTMX de Login -->
-    <div id="auth-feedback"></div>
 
     <!-- Divisor OAuth2 -->
     <div class="relative flex py-1 items-center">
@@ -98,5 +111,35 @@
       <a href="/" class="text-slate-400 hover:text-slate-200">Voltar ao Dashboard</a>
     </div>
   </div>
+
+  <script>
+    function togglePasswordVisibility(inputId, btn) {
+      const input = document.getElementById(inputId);
+      if (!input) return;
+      if (input.type === 'password') {
+        input.type = 'text';
+        btn.textContent = '🙈';
+      } else {
+        input.type = 'password';
+        btn.textContent = '👁️';
+      }
+    }
+
+    // Redirecionamento automático e imediato após autenticação bem-sucedida
+    document.body.addEventListener('htmx:afterOnLoad', function (evt) {
+      const redir = evt.detail.xhr && evt.detail.xhr.getResponseHeader('HX-Redirect');
+      if (redir) {
+        window.location.replace(redir);
+      }
+    });
+    document.body.addEventListener('htmx:afterSwap', function (evt) {
+      if (evt.detail.target && evt.detail.target.id === 'auth-feedback') {
+        const link = document.getElementById('dashboard-redirect-link');
+        if (link && link.href) {
+          window.location.replace(link.href);
+        }
+      }
+    });
+  </script>
 </body>
 </html>

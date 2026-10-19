@@ -794,7 +794,9 @@ async fn test_phase_4_5_registration_argon2i_login_cpf_lookup_and_oauth() {
     // 1. Verifica Telas Web de Login e Cadastro (`GET /web/login` e `GET /web/register`)
     let (status, login_html) = send_get_html(&app, "/web/login").await;
     assert_eq!(status, StatusCode::OK);
-    assert!(login_html.contains("Acesso exclusivo por E-mail · Segurança Argon2i"));
+    assert!(login_html.contains("Acesso exclusivo por E-mail · Conexão Segura"));
+    assert!(!login_html.contains("Argon2i"));
+    assert!(login_html.contains("togglePasswordVisibility"));
     assert!(login_html.contains("Continuar com Google (Gmail)"));
     assert!(login_html.contains("Continuar com Microsoft Office"));
     assert!(login_html.contains("Continuar com Instagram"));
@@ -805,6 +807,10 @@ async fn test_phase_4_5_registration_argon2i_login_cpf_lookup_and_oauth() {
         register_html.contains("Cadastro Completo · Player &amp; Coach")
             || register_html.contains("Cadastro Completo · Player & Coach")
     );
+    assert!(!register_html.contains("Argon2i"));
+    assert!(register_html.contains("togglePasswordVisibility"));
+    assert!(register_html.contains("Confirme sua Senha"));
+    assert!(register_html.contains("onConfirmPasswordInput"));
     assert!(register_html.contains("Posição em Quadra"));
     assert!(register_html.contains("Esquerda / Revés"));
     assert!(register_html.contains("Direita / Drive"));
@@ -1640,4 +1646,140 @@ async fn test_fase_4_7_security_rbac_bola_lgpd_password_rotation_and_csrf() {
             .unwrap()
             .contains("frame-ancestors 'none'")
     );
+}
+
+#[tokio::test]
+async fn test_user_soft_delete_deactivation_and_reactivation() {
+    use player_scout::{
+        api::auth::{AuthResponse, LoginRequest},
+        domain::RegistrationInput,
+    };
+
+    let app = setup_test_app().await;
+    let unique_uuid = Uuid::now_v7();
+    let seed = (unique_uuid.as_u128() & 0xFFFF_FFFF) as u64;
+    let player_cpf = generate_unique_valid_cpf(seed + 999);
+    let player_email = format!("soft.delete.{unique_uuid}@playerscout.test");
+    let password = "StrongPassword2026!#";
+
+    // 1. Cadastra usuário via API
+    let reg_req = RegistrationInput {
+        first_name: "Usuario".to_string(),
+        last_name: "Desativavel".to_string(),
+        age: 30,
+        cpf: player_cpf.clone(),
+        email: player_email.clone(),
+        whatsapp_phone: "11988887777".to_string(),
+        cep: "01310-100".to_string(),
+        street: "Av Paulista".to_string(),
+        street_number: "500".to_string(),
+        complement: "".to_string(),
+        neighborhood: "Bela Vista".to_string(),
+        city: "São Paulo".to_string(),
+        state: "SP".to_string(),
+        role: UserRole::Player,
+        preferred_side: PreferredSide::Right,
+        dominant_hand: DominantHand::RightHanded,
+        password: password.to_string(),
+    };
+
+    let (status, reg_auth): (StatusCode, AuthResponse) =
+        send_json(&app, Method::POST, "/api/v1/auth/register", Some(&reg_req)).await;
+    assert_eq!(status, StatusCode::CREATED);
+    assert!(reg_auth.user.is_active);
+
+    // 2. Faz login para obter token de sessão ativa
+    let (status, login_res): (StatusCode, AuthResponse) = send_json(
+        &app,
+        Method::POST,
+        "/api/v1/auth/login",
+        Some(&LoginRequest {
+            email: player_email.clone(),
+            password: password.to_string(),
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let active_token = login_res.session_token;
+
+    // Confirma que a sessão é válida
+    let session_check_req = Request::builder()
+        .method(Method::GET)
+        .uri("/api/v1/auth/session")
+        .header("authorization", format!("Bearer {active_token}"))
+        .body(Body::empty())
+        .unwrap();
+    let session_check_res = app.clone().oneshot(session_check_req).await.unwrap();
+    assert_eq!(session_check_res.status(), StatusCode::OK);
+
+    // 3. Admin desativa o usuário (Soft Delete) via DELETE /api/v1/users/{id}
+    let admin_token = BOOTSTRAP_SESSION_TOKEN.get().unwrap();
+    let deact_req = Request::builder()
+        .method(Method::DELETE)
+        .uri(format!("/api/v1/users/{}", reg_auth.user.id))
+        .header("authorization", format!("Bearer {admin_token}"))
+        .body(Body::empty())
+        .unwrap();
+    let deact_res = app.clone().oneshot(deact_req).await.unwrap();
+    assert_eq!(deact_res.status(), StatusCode::OK);
+    let deact_bytes = axum::body::to_bytes(deact_res.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let deactivated_user: User = serde_json::from_slice(&deact_bytes).unwrap();
+    assert!(!deactivated_user.is_active);
+
+    // 4. Sessão anterior deve ter sido revogada imediatamente (401 Unauthorized)
+    let revoked_check_req = Request::builder()
+        .method(Method::GET)
+        .uri("/api/v1/auth/session")
+        .header("authorization", format!("Bearer {active_token}"))
+        .body(Body::empty())
+        .unwrap();
+    let revoked_check_res = app.clone().oneshot(revoked_check_req).await.unwrap();
+    assert_eq!(revoked_check_res.status(), StatusCode::UNAUTHORIZED);
+
+    // 5. Nova tentativa de login para conta desativada deve ser bloqueada (403 Forbidden)
+    let (status, deact_login_err): (StatusCode, ErrorResponse) = send_json(
+        &app,
+        Method::POST,
+        "/api/v1/auth/login",
+        Some(&LoginRequest {
+            email: player_email.clone(),
+            password: password.to_string(),
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    assert_eq!(deact_login_err.code, "FORBIDDEN");
+    assert!(deact_login_err.error.contains("desativada"));
+
+    // 6. Admin reativa a conta via POST /api/v1/users/{id}/reactivate
+    let react_req = Request::builder()
+        .method(Method::POST)
+        .uri(format!("/api/v1/users/{}/reactivate", reg_auth.user.id))
+        .header("authorization", format!("Bearer {admin_token}"))
+        .body(Body::empty())
+        .unwrap();
+    let react_res = app.clone().oneshot(react_req).await.unwrap();
+    assert_eq!(react_res.status(), StatusCode::OK);
+    let react_bytes = axum::body::to_bytes(react_res.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let reactivated_user: User = serde_json::from_slice(&react_bytes).unwrap();
+    assert!(reactivated_user.is_active);
+
+    // 7. Login após reativação deve suceder normalmente (200 OK)
+    let (status, react_login_ok): (StatusCode, AuthResponse) = send_json(
+        &app,
+        Method::POST,
+        "/api/v1/auth/login",
+        Some(&LoginRequest {
+            email: player_email.clone(),
+            password: password.to_string(),
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(react_login_ok.user.id, reg_auth.user.id);
+    assert!(react_login_ok.user.is_active);
 }
