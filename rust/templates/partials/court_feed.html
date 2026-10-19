@@ -1,50 +1,58 @@
 <div id="court-feed-content" class="space-y-3">
   {% if let Some(msg) = status_banner %}
-  <div class="px-3.5 py-2 rounded-lg bg-emerald-950/80 border border-emerald-700 text-emerald-200 text-xs font-semibold flex items-center justify-between">
+  <div class="px-3.5 py-2 rounded-xl bg-emerald-950/80 border border-emerald-700 text-emerald-200 text-xs font-semibold flex items-center justify-between shadow-sm">
     <span>{{ msg }}</span>
-    <span class="text-[11px] text-emerald-400">Sincronizado</span>
+    <span class="text-[10px] uppercase font-bold text-emerald-400 px-1.5 py-0.5 rounded bg-emerald-900/60">Registrado</span>
   </div>
   {% endif %}
 
   <div class="grid grid-cols-3 gap-2 text-center">
-    <div class="bg-slate-800 border border-slate-700 rounded-lg p-2.5">
-      <div class="text-[11px] uppercase text-slate-400">Jogadas</div>
-      <div class="text-lg font-bold text-white">{{ report.total_shots }}</div>
+    <div class="bg-slate-900 border border-slate-800 rounded-xl p-2.5">
+      <div class="text-[10px] font-black uppercase text-slate-400">Jogadas</div>
+      <div class="text-base font-black text-white">{{ report.total_shots }}</div>
     </div>
-    <div class="bg-slate-800 border border-slate-700 rounded-lg p-2.5">
-      <div class="text-[11px] uppercase text-slate-400">% Acerto</div>
-      <div class="text-lg font-bold text-emerald-400">{{ report.hit_rate_pct }}%</div>
+    <div class="bg-slate-900 border border-slate-800 rounded-xl p-2.5">
+      <div class="text-[10px] font-black uppercase text-slate-400">% Acerto</div>
+      <div class="text-base font-black text-emerald-400">{{ report.hit_rate_pct }}%</div>
     </div>
-    <div class="bg-slate-800 border border-slate-700 rounded-lg p-2.5">
-      <div class="text-[11px] uppercase text-slate-400">% Decisão Boa</div>
-      <div class="text-lg font-bold text-sky-400">{{ report.good_decision_rate_pct }}%</div>
+    <div class="bg-slate-900 border border-slate-800 rounded-xl p-2.5">
+      <div class="text-[10px] font-black uppercase text-slate-400">% Decisão Boa</div>
+      <div class="text-base font-black text-sky-400">{{ report.good_decision_rate_pct }}%</div>
     </div>
   </div>
 
-  <div class="bg-slate-800/90 border border-slate-700 rounded-xl p-3">
-    <div class="text-xs font-bold uppercase text-slate-400 mb-2">Últimos Golpes Registrados</div>
+  <div class="bg-slate-900 border border-slate-800 rounded-2xl p-3">
+    <div class="text-xs font-black uppercase text-slate-400 mb-2">Últimos Golpes Registrados na Partida</div>
     {% if recent_shots.is_empty() %}
       <p class="text-xs text-slate-400 py-2">Nenhum golpe registrado ainda nesta partida.</p>
     {% else %}
       <div class="space-y-1.5">
         {% for shot in recent_shots %}
-        <div class="flex items-center justify-between text-xs py-1.5 px-2.5 rounded bg-slate-900/80 border border-slate-700/60">
+        <div class="flex items-center justify-between text-xs py-2 px-3 rounded-xl bg-slate-950 border border-slate-800">
           <div class="flex items-center gap-2">
-            <span class="px-1.5 py-0.5 rounded bg-slate-700 text-slate-200 font-semibold">S{{ shot.set_number }}</span>
-            <span class="font-bold text-white">{{ shot.shot_type.label_pt() }}</span>
+            <span class="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 font-bold text-[10px]">S{{ shot.set_number }}</span>
+            <span class="font-extrabold text-white">{{ shot.shot_type.label_pt() }}</span>
+            {% if let Some(tag) = shot.special_tag %}
+              {% match tag %}
+                {% when crate::domain::SpecialTag::Winner %}
+                  <span class="px-1.5 py-0.5 rounded bg-blue-950 text-blue-300 border border-blue-700 text-[10px] font-black">⭐ WINNER</span>
+                {% when crate::domain::SpecialTag::UnforcedError %}
+                  <span class="px-1.5 py-0.5 rounded bg-orange-950 text-orange-300 border border-orange-700 text-[10px] font-black">⚠️ ENF</span>
+              {% endmatch %}
+            {% endif %}
           </div>
           <div class="flex items-center gap-1.5">
             {% match shot.outcome %}
               {% when crate::domain::ShotOutcome::Hit %}
-                <span class="px-2 py-0.5 rounded bg-emerald-900/80 text-emerald-300 font-semibold">ACERTOU</span>
+                <span class="px-2 py-0.5 rounded-lg bg-emerald-950 text-emerald-300 border border-emerald-800 font-bold text-[11px]">ACERTOU</span>
               {% when crate::domain::ShotOutcome::Miss %}
-                <span class="px-2 py-0.5 rounded bg-rose-900/80 text-rose-300 font-semibold">ERROU</span>
+                <span class="px-2 py-0.5 rounded-lg bg-rose-950 text-rose-300 border border-rose-800 font-bold text-[11px]">ERROU</span>
             {% endmatch %}
             {% match shot.decision %}
               {% when crate::domain::DecisionQuality::Good %}
-                <span class="px-1.5 py-0.5 rounded bg-sky-900/60 text-sky-300">Boa</span>
+                <span class="px-1.5 py-0.5 rounded text-sky-400 text-[10px] font-semibold">Decisão Boa</span>
               {% when crate::domain::DecisionQuality::Bad %}
-                <span class="px-1.5 py-0.5 rounded bg-amber-900/70 text-amber-300">Ruim</span>
+                <span class="px-1.5 py-0.5 rounded text-amber-400 text-[10px] font-semibold">Decisão Ruim</span>
             {% endmatch %}
           </div>
         </div>
@@ -53,3 +61,7 @@
     {% endif %}
   </div>
 </div>
+
+<!-- HTMX Out-Of-Band Swaps para atualizar a coluna do atleta sem recarregar -->
+<div id="stat-col-{{ player_id }}" hx-swap-oob="true" class="text-xs font-black text-emerald-400">{{ report.hit_rate_pct }}% IN</div>
+<div id="hits-col-{{ player_id }}" hx-swap-oob="true" class="text-[9px] text-slate-400">{{ report.hits }}/{{ report.total_shots }}</div>

@@ -14,6 +14,7 @@ Este arquivo é a fonte oficial do estado de evolução do projeto. Toda fase e 
 | **Fase 3** | Motor Analítico, Agregação Recursiva & Modo Comparativo | **Concluído** | 100% |
 | **Fase 4** | Frontend Web (Askama, HTMX 4.x, Chart.js & Mobile Touch) | **Concluído** | 100% |
 | **Fase 4.5** | Autenticação, Cadastro Completo, Hash Argon2i & OAuth2 | **Concluído** | 100% |
+| **Fase 4.8** | Hub do Treinador, Ingestão Multi-Atletas (1 Clique) & match_players | **Concluído** | 100% |
 | **Fase 5** | Clientes Móveis (Kotlin / KMP para Android e iOS) | **Pendente** | 0% |
 | **Fase 6** | Testes Automatizados 100% em Rust, CI/CD & Auditoria | **Em Andamento** | 90% |
 
@@ -158,8 +159,27 @@ Este arquivo é a fonte oficial do estado de evolução do projeto. Toda fase e 
 
 ---
 
-### Fase 5: Clientes Móveis (Kotlin / KMP)
-- [ ] Avaliação da arquitetura Kotlin Multiplatform (KMP). 📍 **ETAPA ATUAL**
+### Fase 4.8: Hub do Treinador, Ingestão Web Multi-Atletas (1 Clique) & match_players
+- [x] Migração `007_match_players.sql`: Criação da tabela associativa `match_players` para persistência dos até 4 atletas monitorados na partida com duplas (`team_a`, `team_b`) e lados de quadra (`left`/`right`).
+- [x] Mapeamento Toasty ORM (`MatchPlayerRecord`) e métodos no repositório `Database`.
+- [x] Página de Seleção & Setup da Quadra (`GET /web/matches/setup` e `POST /web/matches/new`) com posicionamento dos atletas e seleção de 1 a 4 jogadores.
+- [x] Console de Quadra Touch-First Multi-Atleta (`GET /web/court`):
+  - Colunas/Divisórias dos atletas monitorados com estatísticas instantâneas (% IN e acertos/total).
+  - Alternância de foco instantânea com 1 toque na coluna do atleta ou teclas 1..4.
+  - Ingestão em 1 clique direto no golpe (`[ ✅ IN ]` em Verde `#10b981` e `[ ❌ OUT ]` em Vermelho `#ef4444`).
+  - Cores exclusivas para os 21 golpes do Padel (com golpe "Smash" simplificado).
+  - Modificadores pré-ação: Winner (Azul `#3b82f6`), Erro Não Forçado (Laranja `#f97316`) e Decisão Ruim (Âmbar).
+  - Controle dinâmico de placar de games (`+` / `-`) e fechamento de set.
+  - Otimização de performance com HTMX Out-Of-Band swaps (`hx-swap-oob="true"`).
+  - Sem botões de Undo no topo ou no rodapé.
+- [x] Dashboard Pós-Partida com botão de destaque `⚡ Nova Partida` direcionando para diálogo de escolha (mesmos atletas ou nova escalação).
+- [x] Cadastro rápido de Sparring / Atleta Convidado (sem formulários longos).
+- [x] Suíte de testes automatizados 100% em Rust cobrindo todo o fluxo multi-atleta e persistência `match_players`.
+
+---
+
+### Fase 5: Clientes Móveis (Kotlin / KMP) 📍 **ETAPA ATUAL**
+- [ ] Avaliação da arquitetura Kotlin Multiplatform (KMP).
 - [ ] Implementação do módulo compartilhado (camada de rede, modelos e cache offline para uso em quadra sem sinal).
 - [ ] Cliente Android (Android 13+) em Jetpack Compose.
 - [ ] Camada cliente iOS (avaliação de Compose Multiplatform ou camada hospedeira Swift conforme [AGENTS.md](file:///home/jc/codigos/rust/player-scout/AGENTS.md)).

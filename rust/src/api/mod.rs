@@ -58,6 +58,14 @@ pub fn app_router(db: Database) -> Router {
     let protected_routes = Router::new()
         .route("/", get(web::dashboard_page))
         .route("/web/dashboard", get(web::dashboard_page))
+        .route("/web/matches/setup", get(web::match_setup_page))
+        .route("/web/matches/new", post(web::create_match_web))
+        .route("/web/matches/rematch", post(web::rematch_web))
+        .route(
+            "/web/matches/quick-player",
+            post(web::create_quick_player_web),
+        )
+        .route("/web/court/match/finish", post(web::finish_match_web))
         .route("/web/court", get(web::court_page))
         .route("/web/partials/analytics", get(web::analytics_partial))
         .route("/web/partials/compare", get(web::compare_partial))

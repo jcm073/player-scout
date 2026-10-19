@@ -1,3 +1,4 @@
+use crate::domain::player::PreferredSide;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -9,6 +10,50 @@ pub enum MatchStatus {
     InProgress,
     Completed,
     Canceled,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MatchTeam {
+    TeamA,
+    TeamB,
+}
+
+impl MatchTeam {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::TeamA => "team_a",
+            Self::TeamB => "team_b",
+        }
+    }
+
+    pub fn label_pt(&self) -> &'static str {
+        match self {
+            Self::TeamA => "Dupla A",
+            Self::TeamB => "Dupla B",
+        }
+    }
+}
+
+impl std::str::FromStr for MatchTeam {
+    type Err = String;
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        match s {
+            "team_a" | "TeamA" | "A" => Ok(Self::TeamA),
+            "team_b" | "TeamB" | "B" => Ok(Self::TeamB),
+            other => Err(format!("Time inválido: {}", other)),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MatchPlayer {
+    pub match_id: Uuid,
+    pub player_id: Uuid,
+    pub team: MatchTeam,
+    pub court_side: PreferredSide,
+    pub is_scouted: bool,
+    pub created_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

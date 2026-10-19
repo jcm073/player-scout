@@ -17,7 +17,7 @@ use crate::{
     db::{Database, NewShotInput},
     domain::{
         AnalyticsComparisonReport, AnalyticsFilter, AuthenticatedUser, DecisionQuality,
-        MatchSession, OAuthProvider, Player, PlayerAnalyticsReport, PreferredSide,
+        MatchSession, MatchTeam, OAuthProvider, Player, PlayerAnalyticsReport, PreferredSide,
         RegistrationInput, ShotEvent, ShotOutcome, ShotType, SpecialTag,
     },
     error::{AppError, Result},
@@ -50,6 +50,7 @@ pub struct ComparePanelTemplate {
 #[derive(Template)]
 #[template(path = "partials/court_feed.html")]
 pub struct CourtFeedTemplate {
+    pub player_id: Uuid,
     pub status_banner: Option<String>,
     pub report: PlayerAnalyticsReport,
     pub recent_shots: Vec<ShotEvent>,
@@ -67,6 +68,7 @@ pub struct DashboardTemplate {
     pub user_whatsapp: String,
     pub user_initials: String,
     pub can_write_shots: bool,
+    pub just_finished: bool,
     pub player_id: Uuid,
     pub player_name: String,
     pub player_side: String,
@@ -122,17 +124,43 @@ pub struct UpdatePasswordForm {
     pub confirm_password: String,
 }
 
+#[derive(Debug, Clone)]
+pub struct CourtAthleteView {
+    pub player_id: Uuid,
+    pub name: String,
+    pub team: String,
+    pub team_label: String,
+    pub court_side: String,
+    pub is_scouted: bool,
+    pub color_hex: String,
+    pub in_percentage: u32,
+    pub hits: usize,
+    pub total: usize,
+}
+
 #[derive(Template)]
 #[template(path = "court.html")]
 pub struct CourtTemplate {
     pub actor_id: Uuid,
-    pub player_id: Uuid,
     pub match_id: Uuid,
+    pub player_id: Uuid,
     pub player_name: String,
+    pub match_score: String,
+    pub current_set: u8,
+    pub athletes: Vec<CourtAthleteView>,
     pub serve_shots: &'static [ShotType],
     pub net_shots: &'static [ShotType],
     pub backcourt_shots: &'static [ShotType],
     pub feed_html: String,
+}
+
+#[derive(Template)]
+#[template(path = "match_setup.html")]
+pub struct MatchSetupTemplate {
+    pub actor_id: Uuid,
+    pub user_name: String,
+    pub available_players: Vec<Player>,
+    pub error: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -141,6 +169,7 @@ pub struct WebDashboardQuery {
     pub player_id: Option<Uuid>,
     pub match_id: Option<Uuid>,
     pub set_number: Option<u8>,
+    pub just_finished: Option<bool>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -274,6 +303,7 @@ pub async fn dashboard_page(
             user_whatsapp,
             user_initials,
             can_write_shots,
+            just_finished: query.just_finished.unwrap_or(false),
             player_id,
             player_name,
             player_side,
@@ -307,6 +337,7 @@ pub async fn dashboard_page(
         user_whatsapp,
         user_initials,
         can_write_shots,
+        just_finished: query.just_finished.unwrap_or(false),
         player_id: nil_id,
         player_name: "Nenhum atleta vinculado".to_string(),
         player_side: "Drive / Revés".to_string(),
@@ -330,15 +361,85 @@ pub async fn court_page(
 ) -> Result<Html<String>> {
     let actor_id = auth_user.resolve_actor_id(query.actor_id)?;
 
-    if let (Some(player_id), Some(match_id)) = (query.player_id, query.match_id) {
-        let player = db.verify_player_read_access(actor_id, player_id).await?;
-        let feed_html = build_court_feed_html(&db, actor_id, player_id, match_id, None).await?;
+    if let Some(match_id) = query.match_id {
+        let match_session = db.get_match_by_id(match_id).await?;
+        let match_players = db.list_match_players(match_id).await.unwrap_or_default();
+
+        let mut athlete_views = Vec::new();
+        let colors = ["#06b6d4", "#eab308", "#8b5cf6", "#10b981"]; // Cyan, Amarelo, Roxo, Verde
+
+        for (idx, mp) in match_players.iter().enumerate() {
+            if let Ok(p) = db.get_player_by_id(mp.player_id).await {
+                let filter = AnalyticsFilter {
+                    match_id: Some(match_id),
+                    set_number: None,
+                    from_date: None,
+                    to_date: None,
+                };
+                let report = db
+                    .compute_player_analytics(actor_id, p.id, filter)
+                    .await
+                    .unwrap_or_else(|_| {
+                        PlayerAnalyticsReport::from_events(p.id, AnalyticsFilter::default(), &[])
+                    });
+
+                athlete_views.push(CourtAthleteView {
+                    player_id: p.id,
+                    name: p.name,
+                    team: mp.team.as_str().to_string(),
+                    team_label: mp.team.label_pt().to_string(),
+                    court_side: mp.court_side.label_pt().to_string(),
+                    is_scouted: mp.is_scouted,
+                    color_hex: colors[idx % colors.len()].to_string(),
+                    in_percentage: report.hit_rate_pct as u32,
+                    hits: report.hits,
+                    total: report.total_shots,
+                });
+            }
+        }
+
+        // Se match_players estiver vazio (retrocompatibilidade), carrega o player_id da partida
+        if athlete_views.is_empty()
+            && let Ok(p) = db.get_player_by_id(match_session.player_id).await
+        {
+            athlete_views.push(CourtAthleteView {
+                player_id: p.id,
+                name: p.name,
+                team: "team_a".to_string(),
+                team_label: "Dupla A".to_string(),
+                court_side: p.preferred_side.label_pt().to_string(),
+                is_scouted: true,
+                color_hex: "#06b6d4".to_string(),
+                in_percentage: 0,
+                hits: 0,
+                total: 0,
+            });
+        }
+
+        let active_player_id = query.player_id.unwrap_or_else(|| {
+            athlete_views
+                .first()
+                .map(|a| a.player_id)
+                .unwrap_or(match_session.player_id)
+        });
+
+        let active_player_name = athlete_views
+            .iter()
+            .find(|a| a.player_id == active_player_id)
+            .map(|a| a.name.clone())
+            .unwrap_or_else(|| "Atleta em Quadra".to_string());
+
+        let feed_html =
+            build_court_feed_html(&db, actor_id, active_player_id, match_id, None).await?;
 
         let html = CourtTemplate {
             actor_id,
-            player_id,
             match_id,
-            player_name: player.name,
+            player_id: active_player_id,
+            player_name: active_player_name,
+            match_score: match_session.score.unwrap_or_else(|| "0 - 0".to_string()),
+            current_set: 1,
+            athletes: athlete_views,
             serve_shots: ShotType::serve_shots(),
             net_shots: ShotType::net_shots(),
             backcourt_shots: ShotType::backcourt_shots(),
@@ -352,6 +453,7 @@ pub async fn court_page(
     let nil_id = Uuid::nil();
     let empty_report = PlayerAnalyticsReport::from_events(nil_id, AnalyticsFilter::default(), &[]);
     let feed_html = CourtFeedTemplate {
+        player_id: nil_id,
         status_banner: None,
         report: empty_report,
         recent_shots: Vec::new(),
@@ -360,9 +462,12 @@ pub async fn court_page(
 
     let html = CourtTemplate {
         actor_id,
-        player_id: nil_id,
         match_id: nil_id,
+        player_id: nil_id,
         player_name: "Atleta em Quadra".to_string(),
+        match_score: "0 - 0".to_string(),
+        current_set: 1,
+        athletes: Vec::new(),
         serve_shots: ShotType::serve_shots(),
         net_shots: ShotType::net_shots(),
         backcourt_shots: ShotType::backcourt_shots(),
@@ -530,6 +635,7 @@ async fn build_court_feed_html(
     shots.truncate(5);
 
     let html = CourtFeedTemplate {
+        player_id,
         status_banner,
         report,
         recent_shots: shots,
@@ -537,6 +643,249 @@ async fn build_court_feed_html(
     .render()?;
 
     Ok(html)
+}
+
+/// Renderiza a Página de Seleção & Setup de Partida (`GET /web/matches/setup`)
+pub async fn match_setup_page(
+    State(db): State<Database>,
+    Extension(auth_user): Extension<AuthenticatedUser>,
+    Query(query): Query<WebDashboardQuery>,
+) -> Result<Html<String>> {
+    let actor_id = auth_user.resolve_actor_id(query.actor_id)?;
+    let available_players = db
+        .list_players_for_actor(actor_id)
+        .await
+        .unwrap_or_default();
+
+    let html = MatchSetupTemplate {
+        actor_id,
+        user_name: auth_user.user.name,
+        available_players,
+        error: None,
+    }
+    .render()?;
+
+    Ok(Html(html))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CreateMatchWebForm {
+    pub actor_id: Option<Uuid>,
+    pub p1_id: Option<Uuid>,
+    pub p1_scouted: Option<String>,
+    pub p2_id: Option<Uuid>,
+    pub p2_scouted: Option<String>,
+    pub p3_id: Option<Uuid>,
+    pub p3_scouted: Option<String>,
+    pub p4_id: Option<Uuid>,
+    pub p4_scouted: Option<String>,
+}
+
+/// Cria nova partida multi-atleta e persiste escalação em match_players (`POST /web/matches/new`)
+pub async fn create_match_web(
+    State(db): State<Database>,
+    Extension(auth_user): Extension<AuthenticatedUser>,
+    Form(form): Form<CreateMatchWebForm>,
+) -> Response {
+    let actor_id = match auth_user.resolve_actor_id(form.actor_id) {
+        Ok(id) => id,
+        Err(e) => return (StatusCode::BAD_REQUEST, e.to_string()).into_response(),
+    };
+
+    let primary_player_id = match form.p1_id {
+        Some(id) if !id.is_nil() => id,
+        _ => {
+            let available = db
+                .list_players_for_actor(actor_id)
+                .await
+                .unwrap_or_default();
+            match available.first() {
+                Some(p) => p.id,
+                None => {
+                    return (StatusCode::BAD_REQUEST, "Nenhum atleta selecionado").into_response();
+                }
+            }
+        }
+    };
+
+    let match_session = match db
+        .create_match(actor_id, primary_player_id, None, None)
+        .await
+    {
+        Ok(m) => m,
+        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    };
+
+    // Associa P2 na Dupla A (Drive)
+    if let Some(p2) = form
+        .p2_id
+        .filter(|id| !id.is_nil() && *id != primary_player_id)
+    {
+        let is_scouted = form.p2_scouted.as_deref() == Some("true");
+        let _ = db
+            .assign_match_player(
+                match_session.id,
+                p2,
+                MatchTeam::TeamA,
+                PreferredSide::Right,
+                is_scouted,
+            )
+            .await;
+    }
+
+    // Associa P3 na Dupla B (Revés)
+    if let Some(p3) = form.p3_id.filter(|id| !id.is_nil()) {
+        let is_scouted = form.p3_scouted.as_deref() == Some("true");
+        let _ = db
+            .assign_match_player(
+                match_session.id,
+                p3,
+                MatchTeam::TeamB,
+                PreferredSide::Left,
+                is_scouted,
+            )
+            .await;
+    }
+
+    // Associa P4 na Dupla B (Drive)
+    if let Some(p4) = form.p4_id.filter(|id| !id.is_nil()) {
+        let is_scouted = form.p4_scouted.as_deref() == Some("true");
+        let _ = db
+            .assign_match_player(
+                match_session.id,
+                p4,
+                MatchTeam::TeamB,
+                PreferredSide::Right,
+                is_scouted,
+            )
+            .await;
+    }
+
+    Redirect::to(&format!(
+        "/web/court?actor_id={}&match_id={}",
+        actor_id, match_session.id
+    ))
+    .into_response()
+}
+
+#[derive(Debug, Deserialize)]
+pub struct RematchForm {
+    pub actor_id: Option<Uuid>,
+    pub match_id: Uuid,
+}
+
+/// Cria nova partida com os mesmos atletas da anterior (`POST /web/matches/rematch`)
+pub async fn rematch_web(
+    State(db): State<Database>,
+    Extension(auth_user): Extension<AuthenticatedUser>,
+    Form(form): Form<RematchForm>,
+) -> Response {
+    let actor_id = match auth_user.resolve_actor_id(form.actor_id) {
+        Ok(id) => id,
+        Err(e) => return (StatusCode::BAD_REQUEST, e.to_string()).into_response(),
+    };
+
+    let previous_match = match db.get_match_by_id(form.match_id).await {
+        Ok(m) => m,
+        Err(e) => return (StatusCode::NOT_FOUND, e.to_string()).into_response(),
+    };
+
+    let players = db
+        .list_match_players(form.match_id)
+        .await
+        .unwrap_or_default();
+    let primary_player_id = players
+        .first()
+        .map(|p| p.player_id)
+        .unwrap_or(previous_match.player_id);
+
+    let new_match = match db
+        .create_match(
+            actor_id,
+            primary_player_id,
+            previous_match.opponent_name,
+            None,
+        )
+        .await
+    {
+        Ok(m) => m,
+        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    };
+
+    // Associa os demais jogadores com os mesmos papéis
+    for mp in players.iter().skip(1) {
+        let _ = db
+            .assign_match_player(
+                new_match.id,
+                mp.player_id,
+                mp.team,
+                mp.court_side,
+                mp.is_scouted,
+            )
+            .await;
+    }
+
+    Redirect::to(&format!(
+        "/web/court?actor_id={}&match_id={}",
+        actor_id, new_match.id
+    ))
+    .into_response()
+}
+
+#[derive(Debug, Deserialize)]
+pub struct QuickPlayerForm {
+    pub actor_id: Option<Uuid>,
+    pub name: String,
+    pub preferred_side: String,
+}
+
+/// Criação rápida de atleta sparring / convidado (`POST /web/matches/quick-player`)
+pub async fn create_quick_player_web(
+    State(db): State<Database>,
+    Extension(auth_user): Extension<AuthenticatedUser>,
+    Form(form): Form<QuickPlayerForm>,
+) -> Response {
+    let actor_id = match auth_user.resolve_actor_id(form.actor_id) {
+        Ok(id) => id,
+        Err(e) => return (StatusCode::BAD_REQUEST, e.to_string()).into_response(),
+    };
+
+    let side = match form.preferred_side.as_str() {
+        "right" => PreferredSide::Right,
+        _ => PreferredSide::Left,
+    };
+
+    let _ = db.create_quick_player(actor_id, &form.name, side).await;
+
+    Redirect::to(&format!("/web/matches/setup?actor_id={}", actor_id)).into_response()
+}
+
+#[derive(Debug, Deserialize)]
+pub struct FinishMatchForm {
+    pub actor_id: Option<Uuid>,
+    pub match_id: Uuid,
+    pub score: Option<String>,
+}
+
+/// Finaliza partida de quadra e redireciona para resumo pós-partida (`POST /web/court/match/finish`)
+pub async fn finish_match_web(
+    State(db): State<Database>,
+    Extension(auth_user): Extension<AuthenticatedUser>,
+    Form(form): Form<FinishMatchForm>,
+) -> Response {
+    let actor_id = match auth_user.resolve_actor_id(form.actor_id) {
+        Ok(id) => id,
+        Err(e) => return (StatusCode::BAD_REQUEST, e.to_string()).into_response(),
+    };
+
+    let score = form.score.filter(|s| !s.trim().is_empty());
+    let _ = db.finish_match(actor_id, form.match_id, score).await;
+
+    Redirect::to(&format!(
+        "/?actor_id={}&match_id={}&just_finished=true",
+        actor_id, form.match_id
+    ))
+    .into_response()
 }
 
 /// Renderiza a Tela de Login (`GET /web/login`)

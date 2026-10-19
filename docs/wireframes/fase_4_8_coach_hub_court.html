@@ -1,0 +1,1016 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Player Scout — Wireframe Fase 4.8: Seleção de até 4 Atletas & Scout em Colunas</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            'action-hit': '#10b981',      // Verde para ACERTO (IN)
+            'action-miss': '#ef4444',     // Vermelho para ERRO (OUT)
+            'action-winner': '#3b82f6',   // Azul para WINNER
+            'action-unforced': '#f97316', // Laranja para ERRO NÃO FORÇADO
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* Cores dos 21 golpes do Padel */
+    .shot-saque { --shot-color: #06b6d4; --shot-bg: rgba(6, 182, 212, 0.12); }
+    .shot-recepcao { --shot-color: #14b8a6; --shot-bg: rgba(20, 184, 166, 0.12); }
+    .shot-voleio-dir { --shot-color: #6366f1; --shot-bg: rgba(99, 102, 241, 0.12); }
+    .shot-voleio-esq { --shot-color: #8b5cf6; --shot-bg: rgba(139, 92, 246, 0.12); }
+    .shot-bandeja { --shot-color: #eab308; --shot-bg: rgba(234, 179, 8, 0.12); }
+    .shot-vibora { --shot-color: #f59e0b; --shot-bg: rgba(245, 158, 11, 0.12); }
+    .shot-smash-trazer { --shot-color: #ec4899; --shot-bg: rgba(236, 72, 153, 0.12); }
+    .shot-smash-x3 { --shot-color: #d946ef; --shot-bg: rgba(217, 70, 239, 0.12); }
+    .shot-smash-x4 { --shot-color: #a855f7; --shot-bg: rgba(168, 85, 247, 0.12); }
+    .shot-rulo-grade { --shot-color: #84cc16; --shot-bg: rgba(132, 204, 22, 0.12); }
+    .shot-drop-shot { --shot-color: #f43f5e; --shot-bg: rgba(244, 63, 94, 0.12); }
+    .shot-bloqueio { --shot-color: #64748b; --shot-bg: rgba(100, 116, 139, 0.12); }
+    .shot-batida-dir { --shot-color: #22c55e; --shot-bg: rgba(34, 197, 94, 0.12); }
+    .shot-batida-esq { --shot-color: #10b981; --shot-bg: rgba(16, 185, 129, 0.12); }
+    .shot-globo-dir { --shot-color: #38bdf8; --shot-bg: rgba(56, 189, 248, 0.12); }
+    .shot-globo-esq { --shot-color: #0284c7; --shot-bg: rgba(2, 132, 199, 0.12); }
+    .shot-chiquita { --shot-color: #a3e635; --shot-bg: rgba(163, 230, 53, 0.12); }
+    .shot-saida-dir { --shot-color: #b45309; --shot-bg: rgba(180, 83, 9, 0.12); }
+    .shot-saida-esq { --shot-color: #92400e; --shot-bg: rgba(146, 64, 14, 0.12); }
+    .shot-bajada { --shot-color: #e11d48; --shot-bg: rgba(225, 29, 72, 0.12); }
+    .shot-contra-parede { --shot-color: #94a3b8; --shot-bg: rgba(148, 163, 184, 0.12); }
+
+    .one-click-card {
+      background: var(--shot-bg);
+      border: 1px solid var(--shot-color);
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen font-sans antialiased select-none pb-12">
+
+  <!-- TOPBAR GLOBAL DO WIREFRAME -->
+  <nav class="bg-slate-900 border-b border-slate-800 sticky top-0 z-50 px-4 py-2.5 shadow-md">
+    <div class="max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center gap-2">
+        <span class="text-xl">🎾</span>
+        <div>
+          <span class="font-extrabold text-sm text-white tracking-wide">Player Scout</span>
+          <span class="text-[10px] uppercase font-black px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 ml-1.5">Fase 4.8 · Multi-Scout (Até 4 Atletas)</span>
+        </div>
+      </div>
+
+      <!-- Abas de Navegação -->
+      <div class="flex items-center gap-1.5 bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs font-bold">
+        <button id="tab-select-btn" onclick="switchView('select')" class="px-3 py-1.5 rounded-lg bg-emerald-600 text-white transition flex items-center gap-1.5">
+          <span>1️⃣</span> Seleção de Atletas (Quadra)
+        </button>
+        <button id="tab-court-btn" onclick="switchView('court')" class="px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition flex items-center gap-1.5">
+          <span>2️⃣</span> Scout em Colunas (1 Clique)
+        </button>
+        <button id="tab-analytics-btn" onclick="switchView('analytics')" class="px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition flex items-center gap-1.5">
+          <span>📊</span> Dashboard
+        </button>
+      </div>
+
+      <div class="flex items-center gap-2 text-xs">
+        <div class="w-7 h-7 rounded-full bg-emerald-700 font-black flex items-center justify-center text-white">TR</div>
+        <span class="font-semibold text-slate-300 hidden sm:inline">Treinador Roberto</span>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ========================================================================= -->
+  <!-- ETAPA 1: PÁGINA DE SELEÇÃO DOS ATLETAS (MONTAGEM DAS DUPLAS NA QUADRA) -->
+  <!-- ========================================================================= -->
+  <main id="view-select" class="max-w-4xl mx-auto px-4 py-6 space-y-6">
+    <!-- Cabeçalho -->
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-sm">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <span class="text-[10px] font-black uppercase tracking-wider text-emerald-400">Passo 1 de 2 · Preparação de Quadra</span>
+          <h1 class="text-xl font-black text-white mt-0.5">Seleção de Atletas para o Scout (Até 4 Jogadores)</h1>
+          <p class="text-xs text-slate-400 mt-1">
+            Escolha os atletas que você deseja monitorar nesta partida (podem ser alunos seus nas duas duplas). Marque quem terá o scouting ativo.
+          </p>
+        </div>
+        <div class="text-right flex-shrink-0 self-start sm:self-center">
+          <span id="selected-athletes-count-badge" class="whitespace-nowrap px-3.5 py-1.5 rounded-xl bg-emerald-950 border border-emerald-800 text-emerald-400 text-xs font-black inline-block shadow-sm">
+            4 Atletas Ativos
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Dados Gerais da Partida -->
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+      <div>
+        <label class="block font-bold text-slate-300 mb-1">Torneio / Treino</label>
+        <input type="text" value="Treino Tático Duplas Avançadas" class="w-full min-h-[44px] bg-slate-950 border border-slate-700 rounded-xl px-3 text-white font-semibold" />
+      </div>
+      <div>
+        <label class="block font-bold text-slate-300 mb-1">Formato da Partida</label>
+        <select class="w-full min-h-[44px] bg-slate-950 border border-slate-700 rounded-xl px-3 text-white font-semibold">
+          <option>Melhor de 3 Sets (Oficial)</option>
+          <option>Set Único Pro (9 Games)</option>
+          <option>Tie-break Treino</option>
+        </select>
+      </div>
+      <div>
+        <label class="block font-bold text-slate-300 mb-1">Data / Horário</label>
+        <input type="text" value="Hoje, 17:45" class="w-full min-h-[44px] bg-slate-950 border border-slate-700 rounded-xl px-3 text-white font-semibold" />
+      </div>
+    </div>
+
+    <!-- LAYOUT DA QUADRA DE PADEL: DUPLA A vs DUPLA B (ATÉ 4 ATLETAS) -->
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
+      <div class="flex items-center justify-between">
+        <h2 class="text-xs font-black uppercase tracking-wider text-slate-300 flex items-center gap-2">
+          <span>🎾</span> Posicionamento na Quadra & Atletas Monitorados
+        </h2>
+        <span class="text-[11px] text-slate-400 font-semibold">Marque a caixa para ativar o scout de cada jogador</span>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        
+        <!-- DUPLA A -->
+        <div class="bg-slate-950 border-2 border-emerald-500/40 rounded-2xl p-4 space-y-3">
+          <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+            <span class="text-xs font-black text-emerald-400 uppercase tracking-wide">Dupla A (Lado 1)</span>
+            <span class="text-[10px] text-slate-400">Seus Alunos</span>
+          </div>
+
+          <!-- Jogador 1 (Esquerda / Revés) -->
+          <div class="p-3 rounded-xl bg-slate-900 border border-slate-800 space-y-2">
+            <div class="flex items-center justify-between">
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" id="chk-p1" checked onchange="updateAthletesSelection()" class="w-4 h-4 rounded text-emerald-600 focus:ring-0 bg-slate-950 border-slate-700 cursor-pointer" />
+                <span class="font-extrabold text-xs text-white">Posição 1: Esquerda (Revés)</span>
+              </label>
+              <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800">Scout Ativo</span>
+            </div>
+            <select id="select-p1" onchange="updateAthletesSelection()" class="w-full min-h-[44px] bg-slate-950 border border-slate-700 rounded-xl px-3 text-white font-bold text-xs">
+              <option value="Juan Lebrón" data-role="Revés" data-color="#06b6d4" selected>Juan Lebrón (Revés - Aluno)</option>
+              <option value="Agustín Tapia" data-role="Revés" data-color="#8b5cf6">Agustín Tapia (Revés - Aluno)</option>
+              <option value="Paquito Navarro" data-role="Revés" data-color="#ec4899">Paquito Navarro (Revés - Aluno)</option>
+            </select>
+          </div>
+
+          <!-- Jogador 2 (Direita / Drive) -->
+          <div class="p-3 rounded-xl bg-slate-900 border border-slate-800 space-y-2">
+            <div class="flex items-center justify-between">
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" id="chk-p2" checked onchange="updateAthletesSelection()" class="w-4 h-4 rounded text-emerald-600 focus:ring-0 bg-slate-950 border-slate-700 cursor-pointer" />
+                <span class="font-extrabold text-xs text-white">Posição 2: Direita (Drive)</span>
+              </label>
+              <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800">Scout Ativo</span>
+            </div>
+            <select id="select-p2" onchange="updateAthletesSelection()" class="w-full min-h-[44px] bg-slate-950 border border-slate-700 rounded-xl px-3 text-white font-bold text-xs">
+              <option value="Alejandro Galán" data-role="Drive" data-color="#eab308" selected>Alejandro Galán (Drive - Aluno)</option>
+              <option value="Arturo Coello" data-role="Drive" data-color="#10b981">Arturo Coello (Drive - Aluno)</option>
+              <option value="Federico Chingotto" data-role="Drive" data-color="#38bdf8">Federico Chingotto (Drive - Aluno)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- DUPLA B -->
+        <div class="bg-slate-950 border-2 border-indigo-500/40 rounded-2xl p-4 space-y-3">
+          <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+            <span class="text-xs font-black text-indigo-400 uppercase tracking-wide">Dupla B (Lado 2)</span>
+            <span class="text-[10px] text-slate-400">Alunos ou Adversários</span>
+          </div>
+
+          <!-- Jogador 3 (Esquerda / Revés) -->
+          <div class="p-3 rounded-xl bg-slate-900 border border-slate-800 space-y-2">
+            <div class="flex items-center justify-between">
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" id="chk-p3" checked onchange="updateAthletesSelection()" class="w-4 h-4 rounded text-indigo-600 focus:ring-0 bg-slate-950 border-slate-700 cursor-pointer" />
+                <span class="font-extrabold text-xs text-white">Posição 3: Esquerda (Revés)</span>
+              </label>
+              <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-950 text-indigo-300 border border-indigo-800">Scout Ativo</span>
+            </div>
+            <select id="select-p3" onchange="updateAthletesSelection()" class="w-full min-h-[44px] bg-slate-950 border border-slate-700 rounded-xl px-3 text-white font-bold text-xs">
+              <option value="Agustín Tapia" data-role="Revés" data-color="#8b5cf6" selected>Agustín Tapia (Revés - Aluno)</option>
+              <option value="Franco Stupaczuk" data-role="Revés" data-color="#f59e0b">Franco Stupaczuk (Revés - Aluno)</option>
+              <option value="Adversário Revés" data-role="Revés" data-color="#64748b">Adversário Convidado (Revés)</option>
+            </select>
+          </div>
+
+          <!-- Jogador 4 (Direita / Drive) -->
+          <div class="p-3 rounded-xl bg-slate-900 border border-slate-800 space-y-2">
+            <div class="flex items-center justify-between">
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" id="chk-p4" checked onchange="updateAthletesSelection()" class="w-4 h-4 rounded text-indigo-600 focus:ring-0 bg-slate-950 border-slate-700 cursor-pointer" />
+                <span class="font-extrabold text-xs text-white">Posição 4: Direita (Drive)</span>
+              </label>
+              <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-950 text-indigo-300 border border-indigo-800">Scout Ativo</span>
+            </div>
+            <select id="select-p4" onchange="updateAthletesSelection()" class="w-full min-h-[44px] bg-slate-950 border border-slate-700 rounded-xl px-3 text-white font-bold text-xs">
+              <option value="Arturo Coello" data-role="Drive" data-color="#10b981" selected>Arturo Coello (Drive - Aluno)</option>
+              <option value="Martin Di Nenno" data-role="Drive" data-color="#ec4899">Martin Di Nenno (Drive - Aluno)</option>
+              <option value="Adversário Drive" data-role="Drive" data-color="#64748b">Adversário Convidado (Drive)</option>
+            </select>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Botão de Confirmação & Entrada em Quadra -->
+      <div class="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-slate-800">
+        <span class="text-xs text-slate-400">Você poderá alternar ou visualizar as colunas dos jogadores simultaneamente na quadra.</span>
+        <button onclick="goToCourt()" class="w-full sm:w-auto min-h-[48px] px-8 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-black text-sm uppercase tracking-wide shadow-lg shadow-emerald-950 transition flex items-center justify-center gap-2">
+          <span>🎾</span> Ir para a Tela do Scout (Quadra) &rarr;
+        </button>
+      </div>
+    </div>
+  </main>
+
+  <!-- ========================================================================= -->
+  <!-- ETAPA 2: TELA DO SCOUT EM QUADRA (DIVISÓRIAS / COLUNAS DE ATLETAS) -->
+  <!-- ========================================================================= -->
+  <main id="view-court" class="hidden max-w-6xl mx-auto px-3 py-3 space-y-3">
+    
+    <!-- Topbar da Partida (Sem Undo) -->
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-3 flex flex-wrap items-center justify-between gap-3 shadow-sm">
+      <div class="flex items-center gap-2.5">
+        <button onclick="switchView('select')" class="min-h-[44px] min-w-[44px] rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 flex items-center justify-center font-bold text-sm">
+          &larr; Atletas
+        </button>
+        <div>
+          <div class="flex items-center gap-1.5">
+            <span class="text-[10px] font-black uppercase px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800">Scout em Quadra</span>
+            <span class="text-xs text-slate-400">Treino Tático Duplas</span>
+          </div>
+          <h2 class="text-sm sm:text-base font-black text-white">4 Alunos Supervisionados</h2>
+        </div>
+      </div>
+
+      <!-- Placar do Jogo -->
+      <div class="flex items-center gap-2 bg-slate-950 px-3 py-1.5 rounded-xl border border-slate-800">
+        <span class="text-xs font-black text-slate-400 uppercase">Set 1:</span>
+        <span class="text-emerald-400 font-black text-sm">3</span>
+        <span class="text-slate-500">-</span>
+        <span class="text-indigo-400 font-black text-sm">2</span>
+      </div>
+
+      <!-- Ações do Topo -->
+      <div class="flex items-center gap-2">
+        <button onclick="switchView('analytics')" class="min-h-[44px] px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs">
+          📊 Stats
+        </button>
+        <button onclick="finishMatchConfirm()" class="min-h-[44px] px-4 py-1.5 rounded-xl bg-rose-950/80 border border-rose-800 text-rose-200 font-black text-xs active:scale-95 transition">
+          Fim Partida
+        </button>
+      </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- DIVISÓRIA DE ATLETAS (COLUNAS / SELETORES DIRETOS NA QUADRA) -->
+    <!-- ===================================================================== -->
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-3 space-y-3">
+      <div class="flex items-center justify-between text-xs">
+        <span class="font-extrabold text-slate-300 uppercase tracking-wide flex items-center gap-1.5">
+          <span>👥</span> Colunas dos Atletas Monitorados (Clique para alternar o foco)
+        </span>
+        <span class="text-emerald-400 font-bold text-[11px]" id="current-active-athlete-label">
+          Ativo: Juan Lebrón (Revés - Dupla A)
+        </span>
+      </div>
+
+      <!-- Colunas / Cards dos Atletas (Até 4 Atletas em Quadra) -->
+      <div id="athletes-columns-container" class="grid grid-cols-2 md:grid-cols-4 gap-2">
+        <!-- Atleta 1 (Dupla A) -->
+        <button type="button" onclick="setActiveAthlete(0)" id="athlete-col-0" class="athlete-pill active min-h-[58px] p-2.5 rounded-xl border-2 border-emerald-500 bg-emerald-950/40 text-left transition flex items-center justify-between">
+          <div>
+            <div class="flex items-center gap-1.5">
+              <span class="w-2.5 h-2.5 rounded-full bg-cyan-400"></span>
+              <span class="font-black text-xs text-white" id="name-col-0">Juan Lebrón</span>
+            </div>
+            <div class="text-[10px] text-emerald-300 font-semibold">Dupla A · Revés</div>
+          </div>
+          <div class="text-right">
+            <div class="text-xs font-black text-action-hit" id="stat-col-0">76% IN</div>
+            <div class="text-[9px] text-slate-400" id="hits-col-0">19/25</div>
+          </div>
+        </button>
+
+        <!-- Atleta 2 (Dupla A) -->
+        <button type="button" onclick="setActiveAthlete(1)" id="athlete-col-1" class="athlete-pill min-h-[58px] p-2.5 rounded-xl border border-slate-800 bg-slate-950 text-left transition flex items-center justify-between hover:border-slate-700">
+          <div>
+            <div class="flex items-center gap-1.5">
+              <span class="w-2.5 h-2.5 rounded-full bg-yellow-400"></span>
+              <span class="font-black text-xs text-slate-200" id="name-col-1">Alejandro Galán</span>
+            </div>
+            <div class="text-[10px] text-slate-400 font-semibold">Dupla A · Drive</div>
+          </div>
+          <div class="text-right">
+            <div class="text-xs font-black text-action-hit" id="stat-col-1">71% IN</div>
+            <div class="text-[9px] text-slate-400" id="hits-col-1">15/21</div>
+          </div>
+        </button>
+
+        <!-- Atleta 3 (Dupla B) -->
+        <button type="button" onclick="setActiveAthlete(2)" id="athlete-col-2" class="athlete-pill min-h-[58px] p-2.5 rounded-xl border border-slate-800 bg-slate-950 text-left transition flex items-center justify-between hover:border-slate-700">
+          <div>
+            <div class="flex items-center gap-1.5">
+              <span class="w-2.5 h-2.5 rounded-full bg-purple-400"></span>
+              <span class="font-black text-xs text-slate-200" id="name-col-2">Agustín Tapia</span>
+            </div>
+            <div class="text-[10px] text-indigo-300 font-semibold">Dupla B · Revés</div>
+          </div>
+          <div class="text-right">
+            <div class="text-xs font-black text-action-hit" id="stat-col-2">68% IN</div>
+            <div class="text-[9px] text-slate-400" id="hits-col-2">13/19</div>
+          </div>
+        </button>
+
+        <!-- Atleta 4 (Dupla B) -->
+        <button type="button" onclick="setActiveAthlete(3)" id="athlete-col-3" class="athlete-pill min-h-[58px] p-2.5 rounded-xl border border-slate-800 bg-slate-950 text-left transition flex items-center justify-between hover:border-slate-700">
+          <div>
+            <div class="flex items-center gap-1.5">
+              <span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
+              <span class="font-black text-xs text-slate-200" id="name-col-3">Arturo Coello</span>
+            </div>
+            <div class="text-[10px] text-indigo-300 font-semibold">Dupla B · Drive</div>
+          </div>
+          <div class="text-right">
+            <div class="text-xs font-black text-action-hit" id="stat-col-3">82% IN</div>
+            <div class="text-[9px] text-slate-400" id="hits-col-3">14/17</div>
+          </div>
+        </button>
+      </div>
+    </div>
+
+    <!-- MODIFICADORES PRÉ-AÇÃO (WINNER AZUL, ENF LARANJA, DECISÃO RUIM) -->
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-2.5 grid grid-cols-3 gap-2">
+      <!-- Winner Tag (AZUL) -->
+      <button onclick="toggleModifier('winner')" id="mod-winner" class="min-h-[48px] px-2 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-300 font-extrabold text-xs flex items-center justify-center gap-1 transition active:scale-95">
+        <span class="text-action-winner text-sm">⭐</span>
+        <span>Winner</span>
+      </button>
+
+      <!-- Erro Não Forçado Tag (LARANJA) -->
+      <button onclick="toggleModifier('unforced_error')" id="mod-enf" class="min-h-[48px] px-2 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-300 font-extrabold text-xs flex items-center justify-center gap-1 transition active:scale-95">
+        <span class="text-action-unforced text-sm">⚠️</span>
+        <span>Erro Não Forçado</span>
+      </button>
+
+      <!-- Decisão Ruim Toggle -->
+      <button onclick="toggleModifier('bad_decision')" id="mod-decision" class="min-h-[48px] px-2 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-300 font-extrabold text-xs flex items-center justify-center gap-1 transition active:scale-95">
+        <span class="text-amber-400 text-sm">🧠</span>
+        <span>Decisão Ruim</span>
+      </button>
+    </div>
+
+    <!-- BANNER DE FEEDBACK DO MODIFICADOR ATIVO -->
+    <div id="active-modifier-banner" class="hidden px-3 py-1.5 rounded-xl text-center text-xs font-black tracking-wide"></div>
+
+    <!-- ================================================================= -->
+    <!-- GRADE DOS 21 GOLPES: INGESTÃO EM 1 CLIQUE DIRETO NO ATLETA ATIVO -->
+    <!-- ================================================================= -->
+    <div class="space-y-3">
+      
+      <!-- ZONA 1: INÍCIO DE PONTO -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-3 space-y-2">
+        <div class="text-[11px] font-extrabold uppercase text-cyan-400 flex items-center justify-between">
+          <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-cyan-400"></span> Início de Ponto</span>
+          <span class="text-[10px] text-slate-400 font-normal">1 Toque registra para o atleta selecionado</span>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <!-- Saque -->
+          <div class="one-click-card shot-saque rounded-xl p-2 flex items-center justify-between gap-2 shadow-sm">
+            <div class="flex items-center gap-2">
+              <span class="w-3 h-3 rounded-full bg-cyan-400"></span>
+              <span class="font-extrabold text-xs text-white">Saque</span>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <button onclick="registerShotDirect('saque', 'Saque', 'hit', '#06b6d4')" class="min-h-[48px] px-3.5 rounded-xl bg-action-hit hover:bg-emerald-400 text-white font-black text-xs shadow-md shadow-emerald-950 active:scale-90 transition">
+                ✅ IN
+              </button>
+              <button onclick="registerShotDirect('saque', 'Saque', 'miss', '#06b6d4')" class="min-h-[48px] px-3.5 rounded-xl bg-action-miss hover:bg-red-400 text-white font-black text-xs shadow-md shadow-red-950 active:scale-90 transition">
+                ❌ OUT
+              </button>
+            </div>
+          </div>
+
+          <!-- Recepção -->
+          <div class="one-click-card shot-recepcao rounded-xl p-2 flex items-center justify-between gap-2 shadow-sm">
+            <div class="flex items-center gap-2">
+              <span class="w-3 h-3 rounded-full bg-teal-400"></span>
+              <span class="font-extrabold text-xs text-white">Recepção</span>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <button onclick="registerShotDirect('recepcao', 'Recepção', 'hit', '#14b8a6')" class="min-h-[48px] px-3.5 rounded-xl bg-action-hit hover:bg-emerald-400 text-white font-black text-xs shadow-md shadow-emerald-950 active:scale-90 transition">
+                ✅ IN
+              </button>
+              <button onclick="registerShotDirect('recepcao', 'Recepção', 'miss', '#14b8a6')" class="min-h-[48px] px-3.5 rounded-xl bg-action-miss hover:bg-red-400 text-white font-black text-xs shadow-md shadow-red-950 active:scale-90 transition">
+                ❌ OUT
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ZONA 2: REDE & ATAQUE (10 GOLPES) -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-3 space-y-2">
+        <div class="text-[11px] font-extrabold uppercase text-violet-400 flex items-center justify-between">
+          <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-violet-400"></span> Rede & Ataque</span>
+          <span class="text-[10px] text-slate-400 font-normal">1 Toque registra Golpe + Resultado</span>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+          <!-- Voleio Direita -->
+          <div class="one-click-card shot-voleio-dir rounded-xl p-2 flex items-center justify-between gap-2 shadow-sm">
+            <div class="flex items-center gap-1.5">
+              <span class="w-2.5 h-2.5 rounded-full bg-indigo-500"></span>
+              <span class="font-extrabold text-xs text-white">Voleio Dir.</span>
+            </div>
+            <div class="flex items-center gap-1">
+              <button onclick="registerShotDirect('voleio-dir', 'Voleio Dir.', 'hit', '#6366f1')" class="min-h-[46px] px-3 rounded-xl bg-action-hit hover:bg-emerald-400 text-white font-black text-xs shadow-md active:scale-90 transition">
+                ✅ IN
+              </button>
+              <button onclick="registerShotDirect('voleio-dir', 'Voleio Dir.', 'miss', '#6366f1')" class="min-h-[46px] px-3 rounded-xl bg-action-miss hover:bg-red-400 text-white font-black text-xs shadow-md active:scale-90 transition">
+                ❌ OUT
+              </button>
+            </div>
+          </div>
+
+          <!-- Voleio Esquerda -->
+          <div class="one-click-card shot-voleio-esq rounded-xl p-2 flex items-center justify-between gap-2 shadow-sm">
+            <div class="flex items-center gap-1.5">
+              <span class="w-2.5 h-2.5 rounded-full bg-purple-500"></span>
+              <span class="font-extrabold text-xs text-white">Voleio Esq.</span>
+            </div>
+            <div class="flex items-center gap-1">
+              <button onclick="registerShotDirect('voleio-esq', 'Voleio Esq.', 'hit', '#8b5cf6')" class="min-h-[46px] px-3 rounded-xl bg-action-hit hover:bg-emerald-400 text-white font-black text-xs shadow-md active:scale-90 transition">
+                ✅ IN
+              </button>
+              <button onclick="registerShotDirect('voleio-esq', 'Voleio Esq.', 'miss', '#8b5cf6')" class="min-h-[46px] px-3 rounded-xl bg-action-miss hover:bg-red-400 text-white font-black text-xs shadow-md active:scale-90 transition">
+                ❌ OUT
+              </button>
+            </div>
+          </div>
+
+          <!-- Bandeja -->
+          <div class="one-click-card shot-bandeja rounded-xl p-2 flex items-center justify-between gap-2 shadow-sm">
+            <div class="flex items-center gap-1.5">
+              <span class="w-2.5 h-2.5 rounded-full bg-yellow-500"></span>
+              <span class="font-extrabold text-xs text-white">Bandeja</span>
+            </div>
+            <div class="flex items-center gap-1">
+              <button onclick="registerShotDirect('bandeja', 'Bandeja', 'hit', '#eab308')" class="min-h-[46px] px-3 rounded-xl bg-action-hit hover:bg-emerald-400 text-white font-black text-xs shadow-md active:scale-90 transition">
+                ✅ IN
+              </button>
+              <button onclick="registerShotDirect('bandeja', 'Bandeja', 'miss', '#eab308')" class="min-h-[46px] px-3 rounded-xl bg-action-miss hover:bg-red-400 text-white font-black text-xs shadow-md active:scale-90 transition">
+                ❌ OUT
+              </button>
+            </div>
+          </div>
+
+          <!-- Víbora -->
+          <div class="one-click-card shot-vibora rounded-xl p-2 flex items-center justify-between gap-2 shadow-sm">
+            <div class="flex items-center gap-1.5">
+              <span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+              <span class="font-extrabold text-xs text-white">Víbora</span>
+            </div>
+            <div class="flex items-center gap-1">
+              <button onclick="registerShotDirect('vibora', 'Víbora', 'hit', '#f59e0b')" class="min-h-[46px] px-3 rounded-xl bg-action-hit hover:bg-emerald-400 text-white font-black text-xs shadow-md active:scale-90 transition">
+                ✅ IN
+              </button>
+              <button onclick="registerShotDirect('vibora', 'Víbora', 'miss', '#f59e0b')" class="min-h-[46px] px-3 rounded-xl bg-action-miss hover:bg-red-400 text-white font-black text-xs shadow-md active:scale-90 transition">
+                ❌ OUT
+              </button>
+            </div>
+          </div>
+
+          <!-- Smash -->
+          <div class="one-click-card shot-smash-trazer rounded-xl p-2 flex items-center justify-between gap-2 shadow-sm">
+            <div class="flex items-center gap-1.5">
+              <span class="w-2.5 h-2.5 rounded-full bg-pink-500"></span>
+              <span class="font-extrabold text-xs text-white">Smash</span>
+            </div>
+            <div class="flex items-center gap-1">
+              <button onclick="registerShotDirect('smash-trazer', 'Smash', 'hit', '#ec4899')" class="min-h-[46px] px-3 rounded-xl bg-action-hit hover:bg-emerald-400 text-white font-black text-xs shadow-md active:scale-90 transition">
+                ✅ IN
+              </button>
+              <button onclick="registerShotDirect('smash-trazer', 'Smash', 'miss', '#ec4899')" class="min-h-[46px] px-3 rounded-xl bg-action-miss hover:bg-red-400 text-white font-black text-xs shadow-md active:scale-90 transition">
+                ❌ OUT
+              </button>
+            </div>
+          </div>
+
+          <!-- Smash x3 -->
+          <div class="one-click-card shot-smash-x3 rounded-xl p-2 flex items-center justify-between gap-2 shadow-sm">
+            <div class="flex items-center gap-1.5">
+              <span class="w-2.5 h-2.5 rounded-full bg-fuchsia-500"></span>
+              <span class="font-extrabold text-xs text-white">Smash x3</span>
+            </div>
+            <div class="flex items-center gap-1">
+              <button onclick="registerShotDirect('smash-x3', 'Smash x3', 'hit', '#d946ef')" class="min-h-[46px] px-3 rounded-xl bg-action-hit hover:bg-emerald-400 text-white font-black text-xs shadow-md active:scale-90 transition">
+                ✅ IN
+              </button>
+              <button onclick="registerShotDirect('smash-x3', 'Smash x3', 'miss', '#d946ef')" class="min-h-[46px] px-3 rounded-xl bg-action-miss hover:bg-red-400 text-white font-black text-xs shadow-md active:scale-90 transition">
+                ❌ OUT
+              </button>
+            </div>
+          </div>
+
+          <!-- Smash x4 -->
+          <div class="one-click-card shot-smash-x4 rounded-xl p-2 flex items-center justify-between gap-2 shadow-sm">
+            <div class="flex items-center gap-1.5">
+              <span class="w-2.5 h-2.5 rounded-full bg-purple-400"></span>
+              <span class="font-extrabold text-xs text-white">Smash x4</span>
+            </div>
+            <div class="flex items-center gap-1">
+              <button onclick="registerShotDirect('smash-x4', 'Smash x4', 'hit', '#a855f7')" class="min-h-[46px] px-3 rounded-xl bg-action-hit hover:bg-emerald-400 text-white font-black text-xs shadow-md active:scale-90 transition">
+                ✅ IN
+              </button>
+              <button onclick="registerShotDirect('smash-x4', 'Smash x4', 'miss', '#a855f7')" class="min-h-[46px] px-3 rounded-xl bg-action-miss hover:bg-red-400 text-white font-black text-xs shadow-md active:scale-90 transition">
+                ❌ OUT
+              </button>
+            </div>
+          </div>
+
+          <!-- Rulo na Grade -->
+          <div class="one-click-card shot-rulo-grade rounded-xl p-2 flex items-center justify-between gap-2 shadow-sm">
+            <div class="flex items-center gap-1.5">
+              <span class="w-2.5 h-2.5 rounded-full bg-lime-500"></span>
+              <span class="font-extrabold text-xs text-white">Rulo Grade</span>
+            </div>
+            <div class="flex items-center gap-1">
+              <button onclick="registerShotDirect('rulo-grade', 'Rulo Grade', 'hit', '#84cc16')" class="min-h-[46px] px-3 rounded-xl bg-action-hit hover:bg-emerald-400 text-white font-black text-xs shadow-md active:scale-90 transition">
+                ✅ IN
+              </button>
+              <button onclick="registerShotDirect('rulo-grade', 'Rulo Grade', 'miss', '#84cc16')" class="min-h-[46px] px-3 rounded-xl bg-action-miss hover:bg-red-400 text-white font-black text-xs shadow-md active:scale-90 transition">
+                ❌ OUT
+              </button>
+            </div>
+          </div>
+
+          <!-- Deixadinha (Drop shot) -->
+          <div class="one-click-card shot-drop-shot rounded-xl p-2 flex items-center justify-between gap-2 shadow-sm">
+            <div class="flex items-center gap-1.5">
+              <span class="w-2.5 h-2.5 rounded-full bg-rose-500"></span>
+              <span class="font-extrabold text-xs text-white">Deixadinha</span>
+            </div>
+            <div class="flex items-center gap-1">
+              <button onclick="registerShotDirect('drop-shot', 'Deixadinha', 'hit', '#f43f5e')" class="min-h-[46px] px-3 rounded-xl bg-action-hit hover:bg-emerald-400 text-white font-black text-xs shadow-md active:scale-90 transition">
+                ✅ IN
+              </button>
+              <button onclick="registerShotDirect('drop-shot', 'Deixadinha', 'miss', '#f43f5e')" class="min-h-[46px] px-3 rounded-xl bg-action-miss hover:bg-red-400 text-white font-black text-xs shadow-md active:scale-90 transition">
+                ❌ OUT
+              </button>
+            </div>
+          </div>
+
+          <!-- Bloqueio -->
+          <div class="one-click-card shot-bloqueio rounded-xl p-2 flex items-center justify-between gap-2 shadow-sm">
+            <div class="flex items-center gap-1.5">
+              <span class="w-2.5 h-2.5 rounded-full bg-slate-400"></span>
+              <span class="font-extrabold text-xs text-white">Bloqueio</span>
+            </div>
+            <div class="flex items-center gap-1">
+              <button onclick="registerShotDirect('bloqueio', 'Bloqueio', 'hit', '#64748b')" class="min-h-[46px] px-3 rounded-xl bg-action-hit hover:bg-emerald-400 text-white font-black text-xs shadow-md active:scale-90 transition">
+                ✅ IN
+              </button>
+              <button onclick="registerShotDirect('bloqueio', 'Bloqueio', 'miss', '#64748b')" class="min-h-[46px] px-3 rounded-xl bg-action-miss hover:bg-red-400 text-white font-black text-xs shadow-md active:scale-90 transition">
+                ❌ OUT
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ZONA 3: FUNDO & VIDROS (9 GOLPES) -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-3 space-y-2">
+        <div class="text-[11px] font-extrabold uppercase text-emerald-400 flex items-center justify-between">
+          <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span> Fundo & Vidros</span>
+          <span class="text-[10px] text-slate-400 font-normal">1 Toque registra Golpe + Resultado</span>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+          <!-- Batida Direita -->
+          <div class="one-click-card shot-batida-dir rounded-xl p-2 flex items-center justify-between gap-2 shadow-sm">
+            <div class="flex items-center gap-1.5">
+              <span class="w-2.5 h-2.5 rounded-full bg-green-500"></span>
+              <span class="font-extrabold text-xs text-white">Batida Dir.</span>
+            </div>
+            <div class="flex items-center gap-1">
+              <button onclick="registerShotDirect('batida-dir', 'Batida Dir.', 'hit', '#22c55e')" class="min-h-[46px] px-3 rounded-xl bg-action-hit hover:bg-emerald-400 text-white font-black text-xs shadow-md active:scale-90 transition">
+                ✅ IN
+              </button>
+              <button onclick="registerShotDirect('batida-dir', 'Batida Dir.', 'miss', '#22c55e')" class="min-h-[46px] px-3 rounded-xl bg-action-miss hover:bg-red-400 text-white font-black text-xs shadow-md active:scale-90 transition">
+                ❌ OUT
+              </button>
+            </div>
+          </div>
+
+          <!-- Batida Esquerda -->
+          <div class="one-click-card shot-batida-esq rounded-xl p-2 flex items-center justify-between gap-2 shadow-sm">
+            <div class="flex items-center gap-1.5">
+              <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+              <span class="font-extrabold text-xs text-white">Batida Esq.</span>
+            </div>
+            <div class="flex items-center gap-1">
+              <button onclick="registerShotDirect('batida-esq', 'Batida Esq.', 'hit', '#10b981')" class="min-h-[46px] px-3 rounded-xl bg-action-hit hover:bg-emerald-400 text-white font-black text-xs shadow-md active:scale-90 transition">
+                ✅ IN
+              </button>
+              <button onclick="registerShotDirect('batida-esq', 'Batida Esq.', 'miss', '#10b981')" class="min-h-[46px] px-3 rounded-xl bg-action-miss hover:bg-red-400 text-white font-black text-xs shadow-md active:scale-90 transition">
+                ❌ OUT
+              </button>
+            </div>
+          </div>
+
+          <!-- Globo Direita -->
+          <div class="one-click-card shot-globo-dir rounded-xl p-2 flex items-center justify-between gap-2 shadow-sm">
+            <div class="flex items-center gap-1.5">
+              <span class="w-2.5 h-2.5 rounded-full bg-sky-400"></span>
+              <span class="font-extrabold text-xs text-white">Globo Dir.</span>
+            </div>
+            <div class="flex items-center gap-1">
+              <button onclick="registerShotDirect('globo-dir', 'Globo Dir.', 'hit', '#38bdf8')" class="min-h-[46px] px-3 rounded-xl bg-action-hit hover:bg-emerald-400 text-white font-black text-xs shadow-md active:scale-90 transition">
+                ✅ IN
+              </button>
+              <button onclick="registerShotDirect('globo-dir', 'Globo Dir.', 'miss', '#38bdf8')" class="min-h-[46px] px-3 rounded-xl bg-action-miss hover:bg-red-400 text-white font-black text-xs shadow-md active:scale-90 transition">
+                ❌ OUT
+              </button>
+            </div>
+          </div>
+
+          <!-- Globo Esquerda -->
+          <div class="one-click-card shot-globo-esq rounded-xl p-2 flex items-center justify-between gap-2 shadow-sm">
+            <div class="flex items-center gap-1.5">
+              <span class="w-2.5 h-2.5 rounded-full bg-sky-600"></span>
+              <span class="font-extrabold text-xs text-white">Globo Esq.</span>
+            </div>
+            <div class="flex items-center gap-1">
+              <button onclick="registerShotDirect('globo-esq', 'Globo Esq.', 'hit', '#0284c7')" class="min-h-[46px] px-3 rounded-xl bg-action-hit hover:bg-emerald-400 text-white font-black text-xs shadow-md active:scale-90 transition">
+                ✅ IN
+              </button>
+              <button onclick="registerShotDirect('globo-esq', 'Globo Esq.', 'miss', '#0284c7')" class="min-h-[46px] px-3 rounded-xl bg-action-miss hover:bg-red-400 text-white font-black text-xs shadow-md active:scale-90 transition">
+                ❌ OUT
+              </button>
+            </div>
+          </div>
+
+          <!-- Chiquita -->
+          <div class="one-click-card shot-chiquita rounded-xl p-2 flex items-center justify-between gap-2 shadow-sm">
+            <div class="flex items-center gap-1.5">
+              <span class="w-2.5 h-2.5 rounded-full bg-lime-400"></span>
+              <span class="font-extrabold text-xs text-white">Chiquita</span>
+            </div>
+            <div class="flex items-center gap-1">
+              <button onclick="registerShotDirect('chiquita', 'Chiquita', 'hit', '#a3e635')" class="min-h-[46px] px-3 rounded-xl bg-action-hit hover:bg-emerald-400 text-white font-black text-xs shadow-md active:scale-90 transition">
+                ✅ IN
+              </button>
+              <button onclick="registerShotDirect('chiquita', 'Chiquita', 'miss', '#a3e635')" class="min-h-[46px] px-3 rounded-xl bg-action-miss hover:bg-red-400 text-white font-black text-xs shadow-md active:scale-90 transition">
+                ❌ OUT
+              </button>
+            </div>
+          </div>
+
+          <!-- Saída Parede Direita -->
+          <div class="one-click-card shot-saida-dir rounded-xl p-2 flex items-center justify-between gap-2 shadow-sm">
+            <div class="flex items-center gap-1.5">
+              <span class="w-2.5 h-2.5 rounded-full bg-amber-700"></span>
+              <span class="font-extrabold text-xs text-white">Saída Dir.</span>
+            </div>
+            <div class="flex items-center gap-1">
+              <button onclick="registerShotDirect('saida-dir', 'Saída Dir.', 'hit', '#b45309')" class="min-h-[46px] px-3 rounded-xl bg-action-hit hover:bg-emerald-400 text-white font-black text-xs shadow-md active:scale-90 transition">
+                ✅ IN
+              </button>
+              <button onclick="registerShotDirect('saida-dir', 'Saída Dir.', 'miss', '#b45309')" class="min-h-[46px] px-3 rounded-xl bg-action-miss hover:bg-red-400 text-white font-black text-xs shadow-md active:scale-90 transition">
+                ❌ OUT
+              </button>
+            </div>
+          </div>
+
+          <!-- Saída Parede Esquerda -->
+          <div class="one-click-card shot-saida-esq rounded-xl p-2 flex items-center justify-between gap-2 shadow-sm">
+            <div class="flex items-center gap-1.5">
+              <span class="w-2.5 h-2.5 rounded-full bg-amber-800"></span>
+              <span class="font-extrabold text-xs text-white">Saída Esq.</span>
+            </div>
+            <div class="flex items-center gap-1">
+              <button onclick="registerShotDirect('saida-esq', 'Saída Esq.', 'hit', '#92400e')" class="min-h-[46px] px-3 rounded-xl bg-action-hit hover:bg-emerald-400 text-white font-black text-xs shadow-md active:scale-90 transition">
+                ✅ IN
+              </button>
+              <button onclick="registerShotDirect('saida-esq', 'Saída Esq.', 'miss', '#92400e')" class="min-h-[46px] px-3 rounded-xl bg-action-miss hover:bg-red-400 text-white font-black text-xs shadow-md active:scale-90 transition">
+                ❌ OUT
+              </button>
+            </div>
+          </div>
+
+          <!-- Bajada de Parede -->
+          <div class="one-click-card shot-bajada rounded-xl p-2 flex items-center justify-between gap-2 shadow-sm">
+            <div class="flex items-center gap-1.5">
+              <span class="w-2.5 h-2.5 rounded-full bg-rose-600"></span>
+              <span class="font-extrabold text-xs text-white">Bajada</span>
+            </div>
+            <div class="flex items-center gap-1">
+              <button onclick="registerShotDirect('bajada', 'Bajada', 'hit', '#e11d48')" class="min-h-[46px] px-3 rounded-xl bg-action-hit hover:bg-emerald-400 text-white font-black text-xs shadow-md active:scale-90 transition">
+                ✅ IN
+              </button>
+              <button onclick="registerShotDirect('bajada', 'Bajada', 'miss', '#e11d48')" class="min-h-[46px] px-3 rounded-xl bg-action-miss hover:bg-red-400 text-white font-black text-xs shadow-md active:scale-90 transition">
+                ❌ OUT
+              </button>
+            </div>
+          </div>
+
+          <!-- Contra-parede -->
+          <div class="one-click-card shot-contra-parede rounded-xl p-2 flex items-center justify-between gap-2 shadow-sm">
+            <div class="flex items-center gap-1.5">
+              <span class="w-2.5 h-2.5 rounded-full bg-slate-400"></span>
+              <span class="font-extrabold text-xs text-white">Contra-parede</span>
+            </div>
+            <div class="flex items-center gap-1">
+              <button onclick="registerShotDirect('contra-parede', 'Contra-parede', 'hit', '#94a3b8')" class="min-h-[46px] px-3 rounded-xl bg-action-hit hover:bg-emerald-400 text-white font-black text-xs shadow-md active:scale-90 transition">
+                ✅ IN
+              </button>
+              <button onclick="registerShotDirect('contra-parede', 'Contra-parede', 'miss', '#94a3b8')" class="min-h-[46px] px-3 rounded-xl bg-action-miss hover:bg-red-400 text-white font-black text-xs shadow-md active:scale-90 transition">
+                ❌ OUT
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- FEED EM TEMPO REAL AO VIVO (COM O ATLETA QUE EXECUTOU O GOLPE) -->
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-3 space-y-2">
+      <div class="text-[11px] font-extrabold uppercase text-slate-400 flex items-center justify-between">
+        <span>Últimas Jogadas Registradas na Partida</span>
+        <span class="text-[10px] text-emerald-400 font-bold">Ao Vivo</span>
+      </div>
+      <div id="shots-feed-list" class="space-y-1.5">
+        <div class="p-2 rounded-xl bg-slate-950 border-l-4 border-l-action-hit border border-slate-800 flex items-center justify-between text-xs">
+          <div class="flex items-center gap-2">
+            <span class="px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-400 text-[10px] font-black border border-emerald-800">Juan Lebrón</span>
+            <span class="w-2 h-2 rounded-full" style="background-color: #ec4899;"></span>
+            <span class="font-extrabold text-white">Smash</span>
+            <span class="text-[10px] px-1.5 py-0.5 rounded bg-blue-950 text-action-winner border border-blue-800 font-black">WINNER</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="font-black text-action-hit">ACERTOU</span>
+            <span class="text-[10px] text-slate-400">agora</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- ========================================================================= -->
+  <!-- ETAPA 3: DASHBOARD RECÍPROCO (VISUALIZAÇÃO COMPARATIVA DOS 4 ATLETAS) -->
+  <!-- ========================================================================= -->
+  <main id="view-analytics" class="hidden max-w-5xl mx-auto px-4 py-6 space-y-6">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 flex flex-col sm:flex-row items-center justify-between gap-4">
+      <div>
+        <span class="text-xs font-bold text-emerald-400 uppercase">Análise Comparativa dos 4 Alunos</span>
+        <h1 class="text-xl font-black text-white">Treino Tático · Rendimento por Jogador</h1>
+        <p class="text-xs text-slate-400 mt-1">Comparação instantânea alimentada pelos cliques simultâneos nas colunas da quadra.</p>
+      </div>
+      <button onclick="switchView('select')" class="min-h-[48px] px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-black text-xs uppercase tracking-wider shadow-lg shadow-emerald-950 flex items-center gap-2 transition">
+        <span>⚡</span> Nova Partida
+      </button>
+    </div>
+
+    <!-- Cards dos 4 Jogadores com Rendimento Comparativo -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+      <!-- Jogador 1 -->
+      <div class="bg-slate-900 border-2 border-emerald-500/60 rounded-2xl p-4 space-y-2">
+        <div class="text-[10px] text-emerald-400 font-black uppercase">Dupla A · Revés</div>
+        <div class="text-base font-extrabold text-white">Juan Lebrón</div>
+        <div class="text-2xl font-black text-action-hit">76% IN</div>
+        <div class="text-[11px] text-slate-400">19 Certos · 6 Erros · 5 Winners</div>
+      </div>
+
+      <!-- Jogador 2 -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-2">
+        <div class="text-[10px] text-emerald-400 font-black uppercase">Dupla A · Drive</div>
+        <div class="text-base font-extrabold text-white">Alejandro Galán</div>
+        <div class="text-2xl font-black text-action-hit">71% IN</div>
+        <div class="text-[11px] text-slate-400">15 Certos · 6 Erros · 3 Winners</div>
+      </div>
+
+      <!-- Jogador 3 -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-2">
+        <div class="text-[10px] text-indigo-400 font-black uppercase">Dupla B · Revés</div>
+        <div class="text-base font-extrabold text-white">Agustín Tapia</div>
+        <div class="text-2xl font-black text-action-hit">68% IN</div>
+        <div class="text-[11px] text-slate-400">13 Certos · 6 Erros · 4 Winners</div>
+      </div>
+
+      <!-- Jogador 4 -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-2">
+        <div class="text-[10px] text-indigo-400 font-black uppercase">Dupla B · Drive</div>
+        <div class="text-base font-extrabold text-white">Arturo Coello</div>
+        <div class="text-2xl font-black text-action-hit">82% IN</div>
+        <div class="text-[11px] text-slate-400">14 Certos · 3 Erros · 6 Winners</div>
+      </div>
+    </div>
+  </main>
+
+  <!-- SCRIPT COMPLETO DO WIREFRAME MULTI-SCOUT -->
+  <script>
+    // Estado dos atletas monitorados (até 4)
+    let athletes = [
+      { id: 'p1', name: 'Juan Lebrón', role: 'Revés', pair: 'Dupla A', active: true, hits: 19, total: 25, color: '#06b6d4' },
+      { id: 'p2', name: 'Alejandro Galán', role: 'Drive', pair: 'Dupla A', active: true, hits: 15, total: 21, color: '#eab308' },
+      { id: 'p3', name: 'Agustín Tapia', role: 'Revés', pair: 'Dupla B', active: true, hits: 13, total: 19, color: '#8b5cf6' },
+      { id: 'p4', name: 'Arturo Coello', role: 'Drive', pair: 'Dupla B', active: true, hits: 14, total: 17, color: '#10b981' },
+    ];
+    let currentAthleteIndex = 0;
+    let activeModifier = null; // 'winner', 'unforced_error' ou 'bad_decision'
+
+    function switchView(viewName) {
+      document.getElementById('view-select').classList.toggle('hidden', viewName !== 'select');
+      document.getElementById('view-court').classList.toggle('hidden', viewName !== 'court');
+      document.getElementById('view-analytics').classList.toggle('hidden', viewName !== 'analytics');
+
+      document.getElementById('tab-select-btn').className = viewName === 'select' ? 'px-3 py-1.5 rounded-lg bg-emerald-600 text-white transition flex items-center gap-1.5' : 'px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition flex items-center gap-1.5';
+      document.getElementById('tab-court-btn').className = viewName === 'court' ? 'px-3 py-1.5 rounded-lg bg-emerald-600 text-white transition flex items-center gap-1.5' : 'px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition flex items-center gap-1.5';
+      document.getElementById('tab-analytics-btn').className = viewName === 'analytics' ? 'px-3 py-1.5 rounded-lg bg-emerald-600 text-white transition flex items-center gap-1.5' : 'px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition flex items-center gap-1.5';
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function updateAthletesSelection() {
+      athletes[0].name = document.getElementById('select-p1').value;
+      athletes[0].active = document.getElementById('chk-p1').checked;
+
+      athletes[1].name = document.getElementById('select-p2').value;
+      athletes[1].active = document.getElementById('chk-p2').checked;
+
+      athletes[2].name = document.getElementById('select-p3').value;
+      athletes[2].active = document.getElementById('chk-p3').checked;
+
+      athletes[3].name = document.getElementById('select-p4').value;
+      athletes[3].active = document.getElementById('chk-p4').checked;
+
+      const activeCount = athletes.filter(a => a.active).length;
+      document.getElementById('selected-athletes-count-badge').textContent = activeCount === 1 ? '1 Atleta Ativo' : `${activeCount} Atletas Ativos`;
+
+      renderCourtAthletesColumns();
+    }
+
+    function renderCourtAthletesColumns() {
+      athletes.forEach((ath, idx) => {
+        const btn = document.getElementById(`athlete-col-${idx}`);
+        const nameEl = document.getElementById(`name-col-${idx}`);
+        if (!btn || !nameEl) return;
+
+        nameEl.textContent = ath.name;
+        btn.style.display = ath.active ? 'flex' : 'none';
+
+        const rate = ath.total > 0 ? Math.round((ath.hits / ath.total) * 100) : 0;
+        document.getElementById(`stat-col-${idx}`).textContent = `${rate}% IN`;
+        document.getElementById(`hits-col-${idx}`).textContent = `${ath.hits}/${ath.total}`;
+      });
+
+      // Garante que o índice ativo seja um atleta visível
+      if (!athletes[currentAthleteIndex] || !athletes[currentAthleteIndex].active) {
+        const firstActive = athletes.findIndex(a => a.active);
+        currentAthleteIndex = firstActive !== -1 ? firstActive : 0;
+      }
+      setActiveAthlete(currentAthleteIndex);
+    }
+
+    function setActiveAthlete(index) {
+      currentAthleteIndex = index;
+      const cur = athletes[index];
+      if (!cur) return;
+
+      athletes.forEach((_, idx) => {
+        const btn = document.getElementById(`athlete-col-${idx}`);
+        if (!btn) return;
+        if (idx === index) {
+          btn.className = 'athlete-pill active min-h-[58px] p-2.5 rounded-xl border-2 border-emerald-500 bg-emerald-950/60 text-left transition flex items-center justify-between shadow-lg shadow-emerald-950/50';
+        } else {
+          btn.className = 'athlete-pill min-h-[58px] p-2.5 rounded-xl border border-slate-800 bg-slate-950 text-left transition flex items-center justify-between hover:border-slate-700';
+        }
+      });
+
+      document.getElementById('current-active-athlete-label').textContent = `Ativo: ${cur.name} (${cur.role} - ${cur.pair})`;
+      if (navigator.vibrate) navigator.vibrate(20);
+    }
+
+    function goToCourt() {
+      updateAthletesSelection();
+      switchView('court');
+    }
+
+    function toggleModifier(mod) {
+      const banner = document.getElementById('active-modifier-banner');
+      const btnWinner = document.getElementById('mod-winner');
+      const btnEnf = document.getElementById('mod-enf');
+      const btnDecision = document.getElementById('mod-decision');
+
+      if (activeModifier === mod) {
+        activeModifier = null;
+        banner.classList.add('hidden');
+        resetModifierButtons();
+      } else {
+        activeModifier = mod;
+        resetModifierButtons();
+        banner.classList.remove('hidden');
+
+        if (mod === 'winner') {
+          btnWinner.classList.add('bg-blue-950', 'border-action-winner', 'text-action-winner');
+          banner.textContent = 'MODO WINNER: O próximo golpe será gravado como WINNER ⭐ (Azul)';
+          banner.className = 'px-3 py-1.5 rounded-xl text-center text-xs font-black tracking-wide bg-blue-950 border border-blue-800 text-action-winner animate-pulse';
+        } else if (mod === 'unforced_error') {
+          btnEnf.classList.add('bg-orange-950', 'border-action-unforced', 'text-action-unforced');
+          banner.textContent = 'MODO ERRO NÃO FORÇADO: O próximo golpe será gravado como ENF ⚠️ (Laranja)';
+          banner.className = 'px-3 py-1.5 rounded-xl text-center text-xs font-black tracking-wide bg-orange-950 border border-orange-800 text-action-unforced animate-pulse';
+        } else if (mod === 'bad_decision') {
+          btnDecision.classList.add('bg-amber-950', 'border-amber-500', 'text-amber-300');
+          banner.textContent = 'MODO DECISÃO RUIM: O próximo golpe será computado com má escolha tática 🧠';
+          banner.className = 'px-3 py-1.5 rounded-xl text-center text-xs font-black tracking-wide bg-amber-950 border border-amber-800 text-amber-300 animate-pulse';
+        }
+      }
+      if (navigator.vibrate) navigator.vibrate(25);
+    }
+
+    function resetModifierButtons() {
+      const btnWinner = document.getElementById('mod-winner');
+      const btnEnf = document.getElementById('mod-enf');
+      const btnDecision = document.getElementById('mod-decision');
+
+      btnWinner.className = 'min-h-[48px] px-2 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-300 font-extrabold text-xs flex items-center justify-center gap-1 transition active:scale-95';
+      btnEnf.className = 'min-h-[48px] px-2 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-300 font-extrabold text-xs flex items-center justify-center gap-1 transition active:scale-95';
+      btnDecision.className = 'min-h-[48px] px-2 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-300 font-extrabold text-xs flex items-center justify-center gap-1 transition active:scale-95';
+    }
+
+    /* INGESTÃO EM 1 CLIQUE DIRECIONADA AO ATLETA ATIVO */
+    function registerShotDirect(shotSlug, shotName, outcome, shotColor) {
+      if (navigator.vibrate) navigator.vibrate(40);
+
+      const ath = athletes[currentAthleteIndex];
+      if (!ath) return;
+
+      let finalTag = null;
+      let finalDecision = 'good';
+
+      if (activeModifier === 'winner' && outcome === 'hit') finalTag = 'winner';
+      else if (activeModifier === 'unforced_error' && outcome === 'miss') finalTag = 'unforced_error';
+      else if (activeModifier === 'bad_decision') finalDecision = 'bad';
+
+      ath.total++;
+      if (outcome === 'hit') ath.hits++;
+
+      // Atualiza o contador na coluna do atleta
+      const rate = Math.round((ath.hits / ath.total) * 100);
+      document.getElementById(`stat-col-${currentAthleteIndex}`).textContent = `${rate}% IN`;
+      document.getElementById(`hits-col-${currentAthleteIndex}`).textContent = `${ath.hits}/${ath.total}`;
+
+      // Insere no feed ao vivo
+      const feed = document.getElementById('shots-feed-list');
+      const item = document.createElement('div');
+      const isHit = outcome === 'hit';
+
+      let tagBadge = '';
+      if (finalTag === 'winner') {
+        tagBadge = '<span class="text-[10px] px-1.5 py-0.5 rounded bg-blue-950 text-action-winner border border-blue-800 font-black">WINNER</span>';
+      } else if (finalTag === 'unforced_error') {
+        tagBadge = '<span class="text-[10px] px-1.5 py-0.5 rounded bg-orange-950 text-action-unforced border border-orange-800 font-black">ENF</span>';
+      } else if (finalDecision === 'bad') {
+        tagBadge = '<span class="text-[10px] px-1.5 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-800 font-black">DECISÃO RUIM</span>';
+      }
+
+      item.className = `p-2 rounded-xl bg-slate-950 border-l-4 ${isHit ? 'border-l-action-hit' : 'border-l-action-miss'} border border-slate-800 flex items-center justify-between text-xs animate-fade-in`;
+      item.innerHTML = `
+        <div class="flex items-center gap-2">
+          <span class="px-1.5 py-0.5 rounded bg-slate-800 text-white font-black text-[10px] border border-slate-700">${ath.name} (${ath.role})</span>
+          <span class="w-2.5 h-2.5 rounded-full" style="background-color: ${shotColor};"></span>
+          <span class="font-extrabold text-white">${shotName}</span>
+          ${tagBadge}
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="font-black ${isHit ? 'text-action-hit' : 'text-action-miss'}">${isHit ? 'ACERTOU' : 'ERROU'}</span>
+          <span class="text-[10px] text-slate-400">agora</span>
+        </div>
+      `;
+      feed.insertBefore(item, feed.firstChild);
+
+      // Reseta modificadores se aplicados
+      if (activeModifier) {
+        activeModifier = null;
+        document.getElementById('active-modifier-banner').classList.add('hidden');
+        resetModifierButtons();
+      }
+    }
+
+    function finishMatchConfirm() {
+      if (confirm('Deseja encerrar a partida e ver as estatísticas analíticas dos 4 atletas?')) {
+        switchView('analytics');
+      }
+    }
+
+    // Inicialização da tela
+    updateAthletesSelection();
+  </script>
+</body>
+</html>
