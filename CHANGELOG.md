@@ -11,6 +11,20 @@ O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.
 ## [Não lançado] - Unreleased
 
 ### Adicionado
+- **Fase 4.8: Hub do Treinador, Ingestão Touch-First em 1 Clique Direto & Suporte Multi-Atletas (`match_players`):**
+  - **Tabela Associativa `match_players` (Migração 007):** Persistência relacional de até 4 atletas escalados por partida com suporte a Dupla A (`team_a`), Dupla B (`team_b`), lados de quadra (`left`/`right`) e flag de scout ativo, evitando perda de estado ao atualizar ou sair da página.
+  - **Mapeamento Toasty ORM & Repositório:** Adicionado `MatchPlayerRecord` em `models.rs`, registro no pool de conexões e métodos `assign_match_player`, `list_match_players`, `create_quick_player` e `finish_match`.
+  - **Página de Seleção de Atletas (`/web/matches/setup`):** Interface para escalação de Dupla A e Dupla B com alvos touch >= 48px, badges de "Scout Ativo" e cadastro rápido de sparring/convidado em 5 segundos.
+  - **Console de Quadra Touch-First com Ingestão em 1 Clique:**
+    - Cards com botões lado a lado `[ ✅ IN ]` (Verde `#10b981`) e `[ ❌ OUT ]` (Vermelho `#ef4444`), eliminando etapas intermediárias.
+    - Cores exclusivas para os 21 golpes do Padel com simplificação do golpe "Smash".
+    - Modificadores pré-ação: Winner (Azul `#3b82f6`), Erro Não Forçado (Laranja `#f97316`) e Decisão Ruim (Âmbar) com auto-reset após disparo.
+    - Colunas/Divisórias dos atletas monitorados com % IN e contadores em tempo real, alternância de foco instantânea (1 toque ou teclas `1..4`).
+    - Remoção completa de botões de desfazer (Undo) no topo e no rodapé.
+    - Feedback tátil (`navigator.vibrate`) e debounce visual de toque.
+    - Otimização com HTMX Out-Of-Band swaps (`hx-swap-oob="true"`) com payloads < 300B e latência < 4ms.
+  - **Fluxo do Botão "Nova Partida":** Exibido exclusivamente após finalizar partida no dashboard, apresentando diálogo para iniciar nova partida com os mesmos atletas imediatamente ou selecionar nova escalação.
+  - **Suíte de Testes Automatizados 100% em Rust:** Adicionado teste de integração `test_fase_4_8_multi_athlete_court_setup_and_nova_partida` cobrindo setup, persistência em `match_players`, ingestão em 1 clique, finalização e revanche.
 - **Redirecionamento Automático Pós-Login para o Dashboard:**
   - Emissão do cabeçalho `HX-Redirect` e script inline de redirecionamento no endpoint `POST /web/partials/auth/login`, conduzindo o usuário instantaneamente para o dashboard analítico ao autenticar.
 - **Blindagem e Reestruturação Completa do Layout do Dashboard Analítico:**

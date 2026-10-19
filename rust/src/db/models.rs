@@ -2,9 +2,9 @@ use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
 use crate::domain::{
-    CoachPlayer, DecisionQuality, DominantHand, MatchSession, MatchStatus, OAuthProvider, Player,
-    PreferredSide, ShotEvent, ShotOutcome, ShotType, SpecialTag, User, UserOAuthAccount, UserRole,
-    UserSession,
+    CoachPlayer, DecisionQuality, DominantHand, MatchPlayer, MatchSession, MatchStatus, MatchTeam,
+    OAuthProvider, Player, PreferredSide, ShotEvent, ShotOutcome, ShotType, SpecialTag, User,
+    UserOAuthAccount, UserRole, UserSession,
 };
 
 /// Extrai o timestamp exato embutido em um UUIDv7 ou retorna `Utc::now()` para UUIDv4
@@ -188,6 +188,32 @@ impl From<CoachPlayerRecord> for CoachPlayer {
             coach_id: rec.coach_id,
             player_id: rec.player_id,
             assigned_at: Utc::now(),
+        }
+    }
+}
+
+/// Modelo Toasty mapeado para a tabela associativa `match_players` (Fase 4.8)
+#[derive(Debug, Clone, toasty::Model)]
+#[table = "match_players"]
+#[key(partition = match_id, local = player_id)]
+pub struct MatchPlayerRecord {
+    pub match_id: Uuid,
+    pub player_id: Uuid,
+    pub team: String,
+    pub court_side: PreferredSide,
+    pub is_scouted: bool,
+}
+
+impl From<MatchPlayerRecord> for MatchPlayer {
+    fn from(rec: MatchPlayerRecord) -> Self {
+        let team = rec.team.parse().unwrap_or(MatchTeam::TeamA);
+        Self {
+            match_id: rec.match_id,
+            player_id: rec.player_id,
+            team,
+            court_side: rec.court_side,
+            is_scouted: rec.is_scouted,
+            created_at: Utc::now(),
         }
     }
 }

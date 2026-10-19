@@ -39,12 +39,20 @@
 
       <!-- Navegação Contextual Autenticada -->
       <nav class="flex flex-wrap items-center gap-2">
-        {% if can_write_shots %}
+        {% if just_finished %}
+        <button
+          type="button"
+          onclick="openNewMatchModal()"
+          class="min-h-[42px] px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black flex items-center gap-1.5 transition shadow-lg shadow-emerald-950 active:scale-95 cursor-pointer"
+        >
+          ⚡ Nova Partida
+        </button>
+        {% else if can_write_shots %}
         <a
-          href="/web/court?actor_id={{ actor_id }}{% if has_valid_player %}&player_id={{ player_id }}{% endif %}{% if let Some(m) = match_id %}&match_id={{ m }}{% endif %}"
+          href="/web/matches/setup?actor_id={{ actor_id }}"
           class="min-h-[42px] px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-bold flex items-center gap-1.5 transition"
         >
-          🎾 Modo Quadra (Touch)
+          🎾 Escalar Partida (Quadra)
         </a>
         {% endif %}
 
@@ -552,7 +560,55 @@
 
     document.addEventListener('DOMContentLoaded', renderPadelRadar);
     document.body.addEventListener('htmx:afterSwap', renderPadelRadar);
+
+    function openNewMatchModal() {
+      const modal = document.getElementById('new-match-modal');
+      if (modal) modal.classList.remove('hidden');
+    }
+    function closeNewMatchModal() {
+      const modal = document.getElementById('new-match-modal');
+      if (modal) modal.classList.add('hidden');
+    }
   </script>
+
+  <!-- Modal de Confirmação: Nova Partida -->
+  <div id="new-match-modal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+      <div class="flex items-center gap-3">
+        <span class="text-3xl">🎾</span>
+        <div>
+          <h3 class="text-base font-black text-white">Iniciar Nova Partida</h3>
+          <p class="text-xs text-slate-400">Deseja iniciar nova partida com os mesmos atletas?</p>
+        </div>
+      </div>
+      <div class="space-y-2 pt-2">
+        {% if let Some(m_id) = match_id %}
+        <form action="/web/matches/rematch" method="POST">
+          <input type="hidden" name="actor_id" value="{{ actor_id }}" />
+          <input type="hidden" name="match_id" value="{{ m_id }}" />
+          <button
+            type="submit"
+            class="w-full min-h-[48px] px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs uppercase tracking-wide transition shadow-lg cursor-pointer flex items-center justify-center gap-2"
+          >
+            <span>✅</span> Sim, mesmos atletas (Ir para Quadra)
+          </button>
+        </form>
+        {% endif %}
+        <a
+          href="/web/matches/setup?actor_id={{ actor_id }}"
+          class="w-full min-h-[48px] px-4 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-black text-xs uppercase tracking-wide transition flex items-center justify-center gap-2"
+        >
+          <span>🔄</span> Não, selecionar novos atletas &rarr;
+        </a>
+      </div>
+      <div class="pt-2 text-center">
+        <button type="button" onclick="closeNewMatchModal()" class="text-xs text-slate-400 hover:text-slate-200 cursor-pointer">
+          Cancelar
+        </button>
+      </div>
+    </div>
+  </div>
 </body>
 </html>
+
 

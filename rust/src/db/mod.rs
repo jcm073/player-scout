@@ -5,18 +5,18 @@ use uuid::Uuid;
 
 use crate::{
     db::models::{
-        CoachPlayerRecord, MatchRecord, PlayerRecord, ShotEventRecord, UserOAuthRecord, UserRecord,
-        UserSessionRecord,
+        CoachPlayerRecord, MatchPlayerRecord, MatchRecord, PlayerRecord, ShotEventRecord,
+        UserOAuthRecord, UserRecord, UserSessionRecord,
     },
     domain::{
         ACCOUNT_LOCKOUT_SECONDS, AnalyticsComparisonReport, AnalyticsFilter, AuthenticatedUser,
         CoachPlayer, DecisionQuality, DomainError, DominantHand, MAX_FAILED_LOGIN_ATTEMPTS,
-        MatchSession, OAuthProvider, Player, PlayerAnalyticsReport, PreferredSide,
-        RegistrationInput, SESSION_TTL_SECONDS, ShotEvent, ShotOutcome, ShotType, SpecialTag, User,
-        UserOAuthAccount, UserRole, UserSession, generate_and_hash_session_token_argon2i,
-        hash_password_argon2i, parse_session_token_id, validate_and_normalize_cpf,
-        validate_and_normalize_email, verify_dummy_password_argon2i, verify_password_argon2i,
-        verify_session_token_argon2i,
+        MatchPlayer, MatchSession, MatchStatus, MatchTeam, OAuthProvider, Player,
+        PlayerAnalyticsReport, PreferredSide, RegistrationInput, SESSION_TTL_SECONDS, ShotEvent,
+        ShotOutcome, ShotType, SpecialTag, User, UserOAuthAccount, UserRole, UserSession,
+        generate_and_hash_session_token_argon2i, hash_password_argon2i, parse_session_token_id,
+        validate_and_normalize_cpf, validate_and_normalize_email, verify_dummy_password_argon2i,
+        verify_password_argon2i, verify_session_token_argon2i,
     },
     error::{AppError, Result},
 };
@@ -37,6 +37,7 @@ impl Database {
                 UserOAuthRecord,
                 PlayerRecord,
                 CoachPlayerRecord,
+                MatchPlayerRecord,
                 MatchRecord,
                 ShotEventRecord,
             ))
@@ -940,7 +941,7 @@ impl Database {
         notes: Option<String>,
     ) -> Result<MatchSession> {
         let _actor = self.require_write_permission(actor_id).await?;
-        let _player = self.verify_player_read_access(actor_id, player_id).await?;
+        let player = self.verify_player_read_access(actor_id, player_id).await?;
 
         let session = MatchSession::new(actor_id, player_id, opponent_name);
         let mut db = self.inner.clone();
@@ -957,6 +958,83 @@ impl Database {
         .exec(&mut db)
         .await?;
 
+        // Registra o jogador primário na tabela associativa match_players
+        let _ = toasty::create!(MatchPlayerRecord {
+            match_id: session.id,
+            player_id: player_id,
+            team: "team_a".to_string(),
+            court_side: player.preferred_side,
+            is_scouted: true,
+        })
+        .exec(&mut db)
+        .await;
+
+        Ok(MatchSession::from(rec))
+    }
+
+    pub async fn assign_match_player(
+        &self,
+        match_id: Uuid,
+        player_id: Uuid,
+        team: MatchTeam,
+        court_side: PreferredSide,
+        is_scouted: bool,
+    ) -> Result<MatchPlayer> {
+        let mut db = self.inner.clone();
+        let rec = toasty::create!(MatchPlayerRecord {
+            match_id: match_id,
+            player_id: player_id,
+            team: team.as_str().to_string(),
+            court_side: court_side,
+            is_scouted: is_scouted,
+        })
+        .exec(&mut db)
+        .await?;
+
+        Ok(MatchPlayer::from(rec))
+    }
+
+    pub async fn list_match_players(&self, match_id: Uuid) -> Result<Vec<MatchPlayer>> {
+        let mut db = self.inner.clone();
+        let records =
+            MatchPlayerRecord::filter(MatchPlayerRecord::fields().match_id().eq(match_id))
+                .exec(&mut db)
+                .await?;
+        Ok(records.into_iter().map(MatchPlayer::from).collect())
+    }
+
+    pub async fn create_quick_player(
+        &self,
+        coach_id: Uuid,
+        name: &str,
+        preferred_side: PreferredSide,
+    ) -> Result<Player> {
+        self.create_player(
+            coach_id,
+            None,
+            name.trim().to_string(),
+            DominantHand::RightHanded,
+            preferred_side,
+            Some("Convidado".to_string()),
+        )
+        .await
+    }
+
+    pub async fn finish_match(
+        &self,
+        actor_id: Uuid,
+        match_id: Uuid,
+        score: Option<String>,
+    ) -> Result<MatchSession> {
+        let _actor = self.require_write_permission(actor_id).await?;
+        let mut db = self.inner.clone();
+        let mut rec = MatchRecord::get_by_id(&mut db, &match_id).await?;
+
+        let mut update = rec.update().status(MatchStatus::Completed);
+        if let Some(s) = score {
+            update = update.score(Some(s));
+        }
+        update.exec(&mut db).await?;
         Ok(MatchSession::from(rec))
     }
 
@@ -1001,7 +1079,24 @@ impl Database {
         let _actor = self.require_write_permission(actor_id).await?;
         let match_session = self.get_match_by_id(match_id).await?;
 
-        if match_session.player_id != input.player_id {
+        // Validação multi-atleta: verifica se o jogador é o titular da partida OU se está escalado em match_players
+        let is_valid_player = if match_session.player_id == input.player_id {
+            true
+        } else {
+            let mut db = self.inner.clone();
+            let link = MatchPlayerRecord::filter(
+                MatchPlayerRecord::fields()
+                    .match_id()
+                    .eq(match_id)
+                    .and(MatchPlayerRecord::fields().player_id().eq(input.player_id)),
+            )
+            .first()
+            .exec(&mut db)
+            .await?;
+            link.is_some()
+        };
+
+        if !is_valid_player {
             return Err(AppError::BadRequest(
                 "O jogador informado não pertence a esta partida".to_string(),
             ));

@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Player Scout — Seleção de Atletas em Quadra</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen font-sans antialiased select-none pb-16">
+
+  <!-- Topbar -->
+  <header class="bg-slate-900 border-b border-slate-800 sticky top-0 z-30 px-4 py-3 shadow-md">
+    <div class="max-w-5xl mx-auto flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center gap-2.5">
+        <span class="text-xl">🎾</span>
+        <div>
+          <div class="flex items-center gap-1.5">
+            <span class="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800">Hub do Treinador</span>
+            <span class="text-xs text-slate-400">Fase 4.8</span>
+          </div>
+          <h1 class="text-sm sm:text-base font-black text-white">Configuração de Partida & Escalação</h1>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <a
+          href="/?actor_id={{ actor_id }}"
+          class="min-h-[42px] px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-bold text-xs flex items-center gap-1.5 transition"
+        >
+          <span>📊</span> Dashboard
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-5xl mx-auto px-3 sm:px-4 py-5 space-y-5">
+    
+    <!-- Banner Informativo -->
+    <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm">
+      <div class="space-y-0.5">
+        <h2 class="text-base font-extrabold text-white">Escalação das Duplas em Quadra</h2>
+        <p class="text-xs text-slate-400">
+          Selecione de 1 até 4 atletas. As estatísticas e colunas individuais serão renderizadas em tempo real na quadra.
+        </p>
+      </div>
+      <div class="whitespace-nowrap flex-shrink-0 px-3 py-1 rounded-xl bg-emerald-950 border border-emerald-800/80 text-emerald-400 text-xs font-black self-start sm:self-auto">
+        4 Atletas Ativos
+      </div>
+    </div>
+
+    {% if let Some(err) = error %}
+    <div class="p-3.5 rounded-xl bg-rose-950/80 border border-rose-800 text-rose-200 text-xs font-semibold">
+      {{ err }}
+    </div>
+    {% endif %}
+
+    <!-- Formulário Principal de Setup -->
+    <form action="/web/matches/new" method="POST" class="space-y-5">
+      <input type="hidden" name="actor_id" value="{{ actor_id }}" />
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        
+        <!-- DUPLA A -->
+        <div class="bg-slate-900 border-2 border-emerald-500/40 rounded-2xl p-4 space-y-4 shadow-sm">
+          <div class="flex items-center justify-between border-b border-slate-800 pb-2.5">
+            <div class="flex items-center gap-2">
+              <span class="w-3 h-3 rounded-full bg-emerald-400"></span>
+              <span class="text-xs font-black text-emerald-400 uppercase tracking-wide">Dupla A (Lado 1)</span>
+            </div>
+            <span class="text-[10px] text-slate-400 font-semibold">Alunos Principais</span>
+          </div>
+
+          <!-- Jogador 1 (Revés) -->
+          <div class="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
+            <div class="flex items-center justify-between">
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" name="p1_scouted" value="true" checked class="w-4 h-4 rounded text-emerald-600 focus:ring-0 bg-slate-900 border-slate-700 cursor-pointer" />
+                <span class="font-extrabold text-xs text-white">Posição 1: Esquerda (Revés)</span>
+              </label>
+              <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800">Scout Ativo</span>
+            </div>
+            <select name="p1_id" class="w-full min-h-[44px] bg-slate-900 border border-slate-700 rounded-xl px-3 text-white font-bold text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+              {% for p in available_players %}
+              <option value="{{ p.id }}">{{ p.name }} ({{ p.preferred_side.label_pt() }})</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <!-- Jogador 2 (Drive) -->
+          <div class="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
+            <div class="flex items-center justify-between">
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" name="p2_scouted" value="true" checked class="w-4 h-4 rounded text-emerald-600 focus:ring-0 bg-slate-900 border-slate-700 cursor-pointer" />
+                <span class="font-extrabold text-xs text-white">Posição 2: Direita (Drive)</span>
+              </label>
+              <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800">Scout Ativo</span>
+            </div>
+            <select name="p2_id" class="w-full min-h-[44px] bg-slate-900 border border-slate-700 rounded-xl px-3 text-white font-bold text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+              <option value="">-- Nenhum / Selecionar --</option>
+              {% for p in available_players %}
+              <option value="{{ p.id }}">{{ p.name }} ({{ p.preferred_side.label_pt() }})</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+
+        <!-- DUPLA B -->
+        <div class="bg-slate-900 border-2 border-indigo-500/40 rounded-2xl p-4 space-y-4 shadow-sm">
+          <div class="flex items-center justify-between border-b border-slate-800 pb-2.5">
+            <div class="flex items-center gap-2">
+              <span class="w-3 h-3 rounded-full bg-indigo-400"></span>
+              <span class="text-xs font-black text-indigo-400 uppercase tracking-wide">Dupla B (Lado 2)</span>
+            </div>
+            <span class="text-[10px] text-slate-400 font-semibold">Alunos ou Adversários</span>
+          </div>
+
+          <!-- Jogador 3 (Revés) -->
+          <div class="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
+            <div class="flex items-center justify-between">
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" name="p3_scouted" value="true" checked class="w-4 h-4 rounded text-indigo-600 focus:ring-0 bg-slate-900 border-slate-700 cursor-pointer" />
+                <span class="font-extrabold text-xs text-white">Posição 3: Esquerda (Revés)</span>
+              </label>
+              <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-950 text-indigo-300 border border-indigo-800">Scout Ativo</span>
+            </div>
+            <select name="p3_id" class="w-full min-h-[44px] bg-slate-900 border border-slate-700 rounded-xl px-3 text-white font-bold text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+              <option value="">-- Nenhum / Selecionar --</option>
+              {% for p in available_players %}
+              <option value="{{ p.id }}">{{ p.name }} ({{ p.preferred_side.label_pt() }})</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <!-- Jogador 4 (Drive) -->
+          <div class="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
+            <div class="flex items-center justify-between">
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" name="p4_scouted" value="true" checked class="w-4 h-4 rounded text-indigo-600 focus:ring-0 bg-slate-900 border-slate-700 cursor-pointer" />
+                <span class="font-extrabold text-xs text-white">Posição 4: Direita (Drive)</span>
+              </label>
+              <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-950 text-indigo-300 border border-indigo-800">Scout Ativo</span>
+            </div>
+            <select name="p4_id" class="w-full min-h-[44px] bg-slate-900 border border-slate-700 rounded-xl px-3 text-white font-bold text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+              <option value="">-- Nenhum / Selecionar --</option>
+              {% for p in available_players %}
+              <option value="{{ p.id }}">{{ p.name }} ({{ p.preferred_side.label_pt() }})</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Barra de Ação & Envio -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+        <span class="text-xs text-slate-400 text-center sm:text-left">
+          Na quadra você poderá alternar entre as colunas com 1 toque ou pelas teclas 1, 2, 3 e 4.
+        </span>
+        <button
+          type="submit"
+          class="w-full sm:w-auto min-h-[48px] px-8 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-black text-sm uppercase tracking-wide shadow-lg shadow-emerald-950 transition flex items-center justify-center gap-2 cursor-pointer"
+        >
+          <span>🎾</span> Ir para a Tela do Scout (Quadra) &rarr;
+        </button>
+      </div>
+    </form>
+
+    <!-- Cadastro Rápido de Atleta Convidado / Sparring -->
+    <div class="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 space-y-3">
+      <div class="flex items-center justify-between">
+        <span class="text-xs font-extrabold text-slate-300 uppercase tracking-wide">
+          ⚡ Adicionar Atleta Convidado / Sparring Rápido
+        </span>
+        <span class="text-[11px] text-slate-400">Sem burocracia (Apenas Nome + Lado)</span>
+      </div>
+      <form action="/web/matches/quick-player" method="POST" class="flex flex-wrap sm:flex-nowrap items-center gap-2">
+        <input type="hidden" name="actor_id" value="{{ actor_id }}" />
+        <input
+          type="text"
+          name="name"
+          placeholder="Nome do Atleta Convidado..."
+          required
+          class="flex-1 min-h-[44px] bg-slate-950 border border-slate-700 rounded-xl px-3.5 text-xs text-white placeholder-slate-500 focus:ring-2 focus:ring-emerald-500 focus:outline-none font-bold"
+        />
+        <select name="preferred_side" class="min-h-[44px] bg-slate-950 border border-slate-700 rounded-xl px-3 text-xs text-white font-bold focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+          <option value="left">Revés (Esquerda)</option>
+          <option value="right">Drive (Direita)</option>
+        </select>
+        <button
+          type="submit"
+          class="min-h-[44px] px-4 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-black transition cursor-pointer flex items-center gap-1.5"
+        >
+          <span>+</span> Criar Sparring
+        </button>
+      </form>
+    </div>
+
+  </main>
+</body>
+</html>

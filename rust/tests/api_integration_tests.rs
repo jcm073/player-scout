@@ -1,6 +1,6 @@
 use axum::{
     body::{Body, to_bytes},
-    http::{Method, Request, StatusCode},
+    http::{HeaderMap, Method, Request, StatusCode},
 };
 use player_scout::{
     AppConfig, Database,
@@ -167,6 +167,42 @@ async fn send_form_html(app: &axum::Router, uri: &str, form_body: &str) -> (Stat
         .await
         .expect("Falha ao ler corpo da resposta Form");
     (status, String::from_utf8_lossy(&bytes).into_owned())
+}
+
+async fn send_form_response(
+    app: &axum::Router,
+    uri: &str,
+    form_body: &str,
+) -> (StatusCode, HeaderMap, String) {
+    let token = BOOTSTRAP_SESSION_TOKEN
+        .get()
+        .map(String::as_str)
+        .unwrap_or("");
+    let req = Request::builder()
+        .method(Method::POST)
+        .uri(uri)
+        .header("content-type", "application/x-www-form-urlencoded")
+        .header("authorization", format!("Bearer {token}"))
+        .header("cookie", format!("ps_session={token}"))
+        .body(Body::from(form_body.to_owned()))
+        .expect("Falha ao construir requisição POST Form");
+
+    let res = app
+        .clone()
+        .oneshot(req)
+        .await
+        .expect("Falha ao executar requisição POST Form");
+
+    let status = res.status();
+    let headers = res.headers().clone();
+    let bytes = to_bytes(res.into_body(), 1024 * 1024)
+        .await
+        .expect("Falha ao ler corpo da resposta Form");
+    (
+        status,
+        headers,
+        String::from_utf8_lossy(&bytes).into_owned(),
+    )
 }
 
 #[tokio::test]
@@ -640,12 +676,12 @@ async fn test_web_askama_htmx_dashboard_and_touch_first_court_flow() {
     .await;
     assert_eq!(status, StatusCode::OK);
     assert!(court_html.contains("Sofia Padel Pro"));
-    assert!(court_html.contains("ACERTOU (IN)"));
-    assert!(court_html.contains("ERROU (OUT)"));
-    assert!(court_html.contains("Desfazer (Undo)"));
+    assert!(court_html.contains("✅ IN"));
+    assert!(court_html.contains("❌ OUT"));
+    assert!(court_html.contains("Winner"));
+    assert!(court_html.contains("Erro Não Forçado"));
     assert!(court_html.contains("navigator.vibrate"));
     assert!(court_html.contains("min-h-[48px]"));
-    assert!(court_html.contains("min-h-[64px]"));
     // Confere presença das 3 zonas táticas e golpes do catálogo de Padel
     assert!(court_html.contains("Início de Ponto"));
     assert!(court_html.contains("Rede &amp; Ataque") || court_html.contains("Rede & Ataque"));
@@ -1782,4 +1818,206 @@ async fn test_user_soft_delete_deactivation_and_reactivation() {
     assert_eq!(status, StatusCode::OK);
     assert_eq!(react_login_ok.user.id, reg_auth.user.id);
     assert!(react_login_ok.user.is_active);
+}
+
+#[tokio::test]
+async fn test_fase_4_8_multi_athlete_court_setup_and_nova_partida() {
+    let app = setup_test_app().await;
+    let db = connect_test_db().await;
+    let unique_tag = Uuid::now_v7();
+
+    // 1. Cria treinador
+    let (status, coach): (StatusCode, User) = send_json(
+        &app,
+        Method::POST,
+        "/api/v1/users",
+        Some(&CreateUserRequest {
+            role: UserRole::Coach,
+            name: "Treinador Padel Pro".to_string(),
+            email: format!("coach.fase48.{unique_tag}@playerscout.test"),
+            password_hash: "argon2_hash_placeholder".to_string(),
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED);
+
+    // 2. Cria 4 atletas alunos
+    let (status, p1): (StatusCode, Player) = send_json(
+        &app,
+        Method::POST,
+        "/api/v1/players",
+        Some(&CreatePlayerRequest {
+            actor_id: coach.id,
+            user_id: None,
+            name: "Juan Lebron".to_string(),
+            dominant_hand: DominantHand::RightHanded,
+            preferred_side: PreferredSide::Left,
+            category: Some("Profissional".to_string()),
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED);
+
+    let (status, p2): (StatusCode, Player) = send_json(
+        &app,
+        Method::POST,
+        "/api/v1/players",
+        Some(&CreatePlayerRequest {
+            actor_id: coach.id,
+            user_id: None,
+            name: "Alejandro Galan".to_string(),
+            dominant_hand: DominantHand::RightHanded,
+            preferred_side: PreferredSide::Right,
+            category: Some("Profissional".to_string()),
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED);
+
+    let (status, p3): (StatusCode, Player) = send_json(
+        &app,
+        Method::POST,
+        "/api/v1/players",
+        Some(&CreatePlayerRequest {
+            actor_id: coach.id,
+            user_id: None,
+            name: "Agustin Tapia".to_string(),
+            dominant_hand: DominantHand::RightHanded,
+            preferred_side: PreferredSide::Left,
+            category: Some("Profissional".to_string()),
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED);
+
+    let (status, p4): (StatusCode, Player) = send_json(
+        &app,
+        Method::POST,
+        "/api/v1/players",
+        Some(&CreatePlayerRequest {
+            actor_id: coach.id,
+            user_id: None,
+            name: "Arturo Coello".to_string(),
+            dominant_hand: DominantHand::LeftHanded,
+            preferred_side: PreferredSide::Right,
+            category: Some("Profissional".to_string()),
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED);
+
+    // 3. GET /web/matches/setup — renderiza página de setup com os atletas disponíveis
+    let (status, setup_html) =
+        send_get_html(&app, &format!("/web/matches/setup?actor_id={}", coach.id)).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(setup_html.contains("Escalação das Duplas em Quadra"));
+    assert!(setup_html.contains("Juan Lebron"));
+    assert!(setup_html.contains("Alejandro Galan"));
+    assert!(setup_html.contains("4 Atletas Ativos"));
+
+    // 4. POST /web/matches/quick-player — criação rápida de sparring
+    let sparring_form = format!(
+        "actor_id={}&name=Sparring+Convidado&preferred_side=left",
+        coach.id
+    );
+    let (status, headers, _) =
+        send_form_response(&app, "/web/matches/quick-player", &sparring_form).await;
+    assert_eq!(status, StatusCode::SEE_OTHER);
+    assert!(
+        headers
+            .get("location")
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .contains("/web/matches/setup")
+    );
+
+    // 5. POST /web/matches/new — cria partida com 4 jogadores e persiste em match_players
+    let new_match_form = format!(
+        "actor_id={}&p1_id={}&p1_scouted=true&p2_id={}&p2_scouted=true&p3_id={}&p3_scouted=true&p4_id={}&p4_scouted=true",
+        coach.id, p1.id, p2.id, p3.id, p4.id
+    );
+    let (status, headers, _) = send_form_response(&app, "/web/matches/new", &new_match_form).await;
+    assert_eq!(status, StatusCode::SEE_OTHER);
+
+    let court_location = headers.get("location").unwrap().to_str().unwrap();
+    assert!(court_location.contains("/web/court?actor_id="));
+    assert!(court_location.contains("&match_id="));
+
+    let match_id_str = court_location.split("&match_id=").nth(1).unwrap();
+    let match_id: Uuid = match_id_str.parse().unwrap();
+
+    // 6. Verifica persistência no PostgreSQL via list_match_players
+    let match_players = db.list_match_players(match_id).await.unwrap();
+    assert_eq!(
+        match_players.len(),
+        4,
+        "Devem existir 4 atletas registrados em match_players"
+    );
+
+    // 7. GET /web/court — renderiza quadra com as 4 colunas de atletas
+    let (status, court_html) = send_get_html(&app, court_location).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(court_html.contains("Juan Lebron"));
+    assert!(court_html.contains("Alejandro Galan"));
+    assert!(court_html.contains("Agustin Tapia"));
+    assert!(court_html.contains("Arturo Coello"));
+    assert!(court_html.contains("✅ IN"));
+    assert!(court_html.contains("❌ OUT"));
+    assert!(court_html.contains("stat-col-"));
+
+    // 8. Ingestão em 1 clique direto para o Jogador 1 (Smash - Hit)
+    let shot_p1_form = format!(
+        "actor_id={}&player_id={}&match_id={}&set_number=1&shot_type=smash_potencia&outcome=hit&decision=good&special_tag=winner",
+        coach.id, p1.id, match_id
+    );
+    let (status, shot_p1_html) =
+        send_form_html(&app, "/web/partials/court/shot", &shot_p1_form).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(shot_p1_html.contains("Smash"));
+    assert!(shot_p1_html.contains("WINNER"));
+    assert!(shot_p1_html.contains("hx-swap-oob"));
+
+    // 9. Ingestão em 1 clique direto para o Jogador 2 (Víbora - Hit)
+    let shot_p2_form = format!(
+        "actor_id={}&player_id={}&match_id={}&set_number=1&shot_type=vibora&outcome=hit&decision=good",
+        coach.id, p2.id, match_id
+    );
+    let (status, _) = send_form_html(&app, "/web/partials/court/shot", &shot_p2_form).await;
+    assert_eq!(status, StatusCode::OK);
+
+    // 10. POST /web/court/match/finish — finaliza partida e redireciona com just_finished=true
+    let finish_form = format!("actor_id={}&match_id={}&score=6-4", coach.id, match_id);
+    let (status, headers, _) =
+        send_form_response(&app, "/web/court/match/finish", &finish_form).await;
+    assert_eq!(status, StatusCode::SEE_OTHER);
+    let finish_loc = headers.get("location").unwrap().to_str().unwrap();
+    assert!(finish_loc.contains("just_finished=true"));
+
+    // 11. Dashboard com just_finished=true exibe o botão ⚡ Nova Partida
+    let (status, dash_html) = send_get_html(&app, finish_loc).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(dash_html.contains("⚡ Nova Partida"));
+    assert!(dash_html.contains("Sim, mesmos atletas"));
+
+    // 12. POST /web/matches/rematch — inicia nova partida preservando os 4 atletas
+    let rematch_form = format!("actor_id={}&match_id={}", coach.id, match_id);
+    let (status, headers, _) =
+        send_form_response(&app, "/web/matches/rematch", &rematch_form).await;
+    assert_eq!(status, StatusCode::SEE_OTHER);
+    let rematch_loc = headers.get("location").unwrap().to_str().unwrap();
+    let new_rematch_id: Uuid = rematch_loc
+        .split("&match_id=")
+        .nth(1)
+        .unwrap()
+        .parse()
+        .unwrap();
+    assert_ne!(new_rematch_id, match_id);
+
+    let rematch_players = db.list_match_players(new_rematch_id).await.unwrap();
+    assert_eq!(
+        rematch_players.len(),
+        4,
+        "A nova partida de revanche deve manter os 4 atletas"
+    );
 }

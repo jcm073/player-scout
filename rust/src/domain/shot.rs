@@ -83,7 +83,7 @@ impl ShotType {
             ShotType::VoleioEsquerda => "Voleio Esquerda",
             ShotType::Bandeja => "Bandeja",
             ShotType::Vibora => "Víbora",
-            ShotType::SmashPotencia => "Smash Trazer",
+            ShotType::SmashPotencia => "Smash",
             ShotType::SmashX3 => "Smash x3",
             ShotType::SmashX4 => "Smash x4",
             ShotType::Rulo => "Rulo na Grade",
@@ -124,6 +124,32 @@ impl ShotType {
             ShotType::SaidaParedeEsquerda => "saida_parede_esquerda",
             ShotType::BajadaParede => "bajada_parede",
             ShotType::ContraParede => "contra_parede",
+        }
+    }
+
+    pub fn color_hex(&self) -> &'static str {
+        match self {
+            ShotType::Saque => "#06b6d4",
+            ShotType::Recepcao => "#14b8a6",
+            ShotType::VoleioDireita => "#6366f1",
+            ShotType::VoleioEsquerda => "#8b5cf6",
+            ShotType::Bandeja => "#eab308",
+            ShotType::Vibora => "#f59e0b",
+            ShotType::SmashPotencia => "#ec4899",
+            ShotType::SmashX3 => "#d946ef",
+            ShotType::SmashX4 => "#a855f7",
+            ShotType::Rulo => "#84cc16",
+            ShotType::Deixadinha => "#f43f5e",
+            ShotType::Bloqueio => "#64748b",
+            ShotType::BatidaDireita => "#22c55e",
+            ShotType::BatidaEsquerda => "#10b981",
+            ShotType::GloboDireita => "#38bdf8",
+            ShotType::GloboEsquerda => "#0284c7",
+            ShotType::Chiquita => "#a3e635",
+            ShotType::SaidaParedeDireita => "#b45309",
+            ShotType::SaidaParedeEsquerda => "#92400e",
+            ShotType::BajadaParede => "#e11d48",
+            ShotType::ContraParede => "#94a3b8",
         }
     }
 
