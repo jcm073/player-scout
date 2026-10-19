@@ -26,7 +26,7 @@ pub fn app_router(db: Database) -> Router {
     let public_routes = Router::new()
         .route("/health", get(health::health_check))
         .route("/api/v1/health", get(health::health_check))
-        .route("/web/login", get(web::login_page))
+        .route("/web/login", get(web::login_page).post(web::web_login))
         .route("/web/register", get(web::register_page))
         .route("/web/partials/auth/login", post(web::web_login_partial))
         .route(
@@ -69,6 +69,8 @@ pub fn app_router(db: Database) -> Router {
             "/web/partials/court/undo",
             post(web::court_undo_shot_partial),
         )
+        .route("/web/preferences/profile", post(web::web_update_profile))
+        .route("/web/preferences/password", post(web::web_update_password))
         .route("/api/v1/auth/session", get(auth::session_status))
         .route("/api/v1/auth/password", post(auth::change_password))
         .route("/api/v1/auth/lookup", get(auth::lookup_user))
@@ -80,7 +82,14 @@ pub fn app_router(db: Database) -> Router {
             "/api/v1/users",
             post(users::create_user).get(users::list_users),
         )
-        .route("/api/v1/users/{id}", get(users::get_user))
+        .route(
+            "/api/v1/users/{id}",
+            get(users::get_user).delete(users::deactivate_user),
+        )
+        .route(
+            "/api/v1/users/{id}/reactivate",
+            post(users::reactivate_user),
+        )
         .route(
             "/api/v1/players",
             post(players::create_player).get(players::list_players),

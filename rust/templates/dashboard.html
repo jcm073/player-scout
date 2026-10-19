@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Player Scout — Dashboard Analítico de Padel</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- HTMX 4.x / Hipertexto Reativo -->
+  <!-- HTMX 2.x (v2.0.4 - Versão Oficial Atual) / Hipertexto Reativo -->
   <script src="https://unpkg.com/htmx.org@2.0.4"></script>
   <!-- Chart.js 4.4.9 (Versão Auditada sem CVEs conhecidos) -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.9/dist/chart.umd.min.js"></script>
@@ -13,67 +13,175 @@
 <body class="bg-slate-950 text-slate-100 min-h-screen font-sans antialiased">
   <!-- Topbar Responsiva -->
   <header class="border-b border-slate-800 bg-slate-900/90 backdrop-blur sticky top-0 z-30">
-    <div class="max-w-7xl mx-auto px-4 py-3.5 flex flex-wrap items-center justify-between gap-3">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+      <!-- Identidade e Usuário Logado -->
       <div class="flex items-center gap-3">
         <div class="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 font-black text-lg">
           PS
         </div>
         <div>
-          <h1 class="text-lg font-extrabold tracking-tight text-white">Player Scout <span class="text-xs font-semibold px-2 py-0.5 ml-1 rounded bg-emerald-900/70 text-emerald-300">PADEL</span></h1>
-          <p class="text-xs text-slate-400">Atleta: <strong class="text-slate-200">{{ player_name }}</strong> · Escopo Recursivo</p>
+          <div class="flex items-center gap-2">
+            <h1 class="text-base font-extrabold tracking-tight text-white">Player Scout</h1>
+            <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-950 border border-emerald-700 text-emerald-300">PADEL</span>
+            {% if user_role == "admin" %}
+              <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-950/80 border border-amber-700 text-amber-300">Admin</span>
+            {% else if user_role == "coach" %}
+              <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-sky-950/80 border border-sky-700 text-sky-300">Treinador</span>
+            {% else %}
+              <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-950/80 border border-emerald-700 text-emerald-300">Atleta</span>
+            {% endif %}
+          </div>
+          <p class="text-xs text-slate-400">
+            Conectado como <strong class="text-slate-200">{{ user_name }}</strong>
+          </p>
         </div>
       </div>
 
+      <!-- Navegação Contextual Autenticada -->
       <nav class="flex flex-wrap items-center gap-2">
+        {% if can_write_shots %}
         <a
-          href="/?actor_id={{ actor_id }}&player_id={{ player_id }}{% if let Some(m) = match_id %}&match_id={{ m }}{% endif %}"
-          class="min-h-[44px] px-4 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold flex items-center"
+          href="/web/court?actor_id={{ actor_id }}{% if has_valid_player %}&player_id={{ player_id }}{% endif %}{% if let Some(m) = match_id %}&match_id={{ m }}{% endif %}"
+          class="min-h-[42px] px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-bold flex items-center gap-1.5 transition"
         >
-          📊 Dashboard Analítico
+          🎾 Modo Quadra (Touch)
         </a>
-        <a
-          href="/web/court?actor_id={{ actor_id }}&player_id={{ player_id }}{% if let Some(m) = match_id %}&match_id={{ m }}{% endif %}"
-          class="min-h-[44px] px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-bold flex items-center"
-        >
-          🎾 Modo Quadra (Touch-First)
-        </a>
-        <a
-          href="/web/register"
-          class="min-h-[44px] px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-bold flex items-center"
-        >
-          📝 Cadastro
-        </a>
-        <a
-          href="/web/login"
-          class="min-h-[44px] px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-bold flex items-center"
-        >
-          🔐 Login
-        </a>
-        <form action="/web/auth/logout" method="POST" class="inline">
+        {% endif %}
+
+        <!-- Menu de Usuário (Avatar / Dropdown) -->
+        <div class="relative">
           <button
-            type="submit"
-            class="min-h-[44px] px-3.5 py-2 rounded-xl bg-rose-950/80 hover:bg-rose-900 border border-rose-700 text-rose-200 text-xs font-bold flex items-center"
+            id="user-menu-btn"
+            type="button"
+            onclick="toggleUserMenu()"
+            aria-haspopup="true"
+            aria-expanded="false"
+            class="min-h-[42px] px-3 py-1.5 rounded-xl bg-slate-800/90 hover:bg-slate-700/90 border border-slate-700 flex items-center gap-2.5 transition focus:outline-none focus:ring-2 focus:ring-emerald-500/50 cursor-pointer"
           >
-            🚪 Sair (Logoff)
+            <div class="w-7 h-7 rounded-lg bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 font-extrabold text-xs flex items-center justify-center">
+              {{ user_initials }}
+            </div>
+            <span class="text-xs font-bold text-slate-200 hidden sm:inline">{{ user_name }}</span>
+            <span class="text-[10px] text-slate-400">▼</span>
           </button>
-        </form>
+
+          <!-- Dropdown Card -->
+          <div
+            id="user-menu-dropdown"
+            class="hidden absolute right-0 mt-2 w-64 bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl p-3 z-50 space-y-3"
+          >
+            <div class="px-2 py-1.5 border-b border-slate-800 space-y-1">
+              <div class="text-xs font-bold text-white truncate">{{ user_name }}</div>
+              <div class="text-[11px] text-slate-400 truncate">{{ user_email }}</div>
+              <div class="flex items-center gap-1.5 pt-1">
+                <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-950 border border-emerald-700 text-emerald-300">
+                  {{ user_role }}
+                </span>
+                <span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
+                  {{ user_preferred_side }}
+                </span>
+              </div>
+            </div>
+
+            <div class="space-y-1">
+              <button
+                type="button"
+                onclick="openPreferencesModal()"
+                class="w-full text-left px-2.5 py-2 rounded-lg text-xs font-semibold text-slate-200 hover:bg-slate-800 hover:text-white flex items-center gap-2 transition cursor-pointer"
+              >
+                <span>⚙️</span> Preferências / Editar Perfil
+              </button>
+
+              <form action="/web/auth/logout" method="POST" class="w-full">
+                <button
+                  type="submit"
+                  class="w-full text-left px-2.5 py-2 rounded-lg text-xs font-bold text-rose-300 hover:bg-rose-950/60 hover:text-rose-200 flex items-center gap-2 transition cursor-pointer"
+                >
+                  <span>🚪</span> Sair da Conta
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
       </nav>
     </div>
   </header>
 
   <main class="max-w-7xl mx-auto px-4 py-6 space-y-6">
-    <!-- Barra de Filtro Recursivo via HTMX -->
+    <!-- Barra de Contexto do Atleta & Seleção de Partida -->
+    <section class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <div class="flex flex-wrap items-center gap-3">
+        <div class="w-9 h-9 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center text-base">
+          👤
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h2 class="text-sm font-extrabold text-white">{{ player_name }}</h2>
+            <span class="text-xs px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-medium border border-slate-700">
+              Posição: {{ player_side }}
+            </span>
+          </div>
+          <p class="text-xs text-slate-400">Escopo Recursivo: Atleta → Temporada → Partida → Set → Jogada</p>
+        </div>
+
+        {% if available_players.len() > 1 %}
+        <!-- Alternador Rápido de Atletas para Treinadores/Admins -->
+        <div class="ml-2">
+          <select
+            onchange="window.location.href='/?actor_id={{ actor_id }}&player_id=' + this.value"
+            aria-label="Trocar Atleta Selecionado"
+            class="min-h-[38px] px-3 py-1.5 rounded-lg bg-slate-950 border border-slate-700 text-xs text-white focus:border-emerald-400 focus:outline-none"
+          >
+            {% for p in available_players %}
+            <option value="{{ p.id }}" {% if self.is_selected_player(&p.id) %}selected{% endif %}>
+              Trocar: {{ p.name }} ({{ p.preferred_side.label_pt() }})
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+        {% endif %}
+      </div>
+
+      {% if !matches.is_empty() %}
+      <!-- Seletor de Partida -->
+      <div class="flex items-center gap-2">
+        <label for="match-select" class="text-xs text-slate-400 font-semibold whitespace-nowrap">Partida:</label>
+        <select
+          id="match-select"
+          onchange="window.location.href=this.value"
+          class="min-h-[38px] px-3 py-1.5 rounded-lg bg-slate-950 border border-slate-700 text-xs text-white focus:border-emerald-400 focus:outline-none"
+        >
+          <option value="/?actor_id={{ actor_id }}&player_id={{ player_id }}">
+            Todas as Partidas (Carreira Completa)
+          </option>
+          {% for m in matches %}
+          <option
+            value="/?actor_id={{ actor_id }}&player_id={{ player_id }}&match_id={{ m.id }}"
+            {% if self.is_selected_match(&m.id) %}selected{% endif %}
+          >
+            vs {% if let Some(opp) = m.opponent_name %}{{ opp }}{% else %}Adversário{% endif %} ({% if let Some(sc) = m.score %}{{ sc }}{% else %}Em andamento{% endif %})
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endif %}
+    </section>
+
+    <!-- Barra de Drill-Down Recursivo via HTMX -->
+    {% if has_valid_player %}
     <section class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3">
       <div class="flex flex-wrap items-center gap-2">
-        <span class="text-xs font-bold uppercase tracking-wider text-slate-400 mr-2">Drill-Down Recursivo:</span>
+        <span class="text-xs font-bold uppercase tracking-wider text-slate-400 mr-2">Drill-Down:</span>
 
         <button
           hx-get="/web/partials/analytics?actor_id={{ actor_id }}&player_id={{ player_id }}"
           hx-target="#analytics-panel"
           hx-swap="innerHTML"
-          class="min-h-[44px] px-3.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-semibold text-white"
+          hx-indicator="#drilldown-indicator"
+          onclick="setActiveDrilldown(this)"
+          class="drilldown-btn min-h-[40px] px-3.5 py-2 rounded-lg {% if self.is_career_scope() %}bg-emerald-600 text-white font-extrabold shadow-sm border border-emerald-500 ring-2 ring-emerald-500/30{% else %}bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-semibold text-slate-300{% endif %} transition active:scale-95 cursor-pointer"
         >
-          Carreira Completa
+          Carreira Completa {% if self.is_career_scope() %}<span class="ml-1 text-[10px] bg-emerald-700 px-1.5 py-0.5 rounded font-bold uppercase">Ativo</span>{% endif %}
         </button>
 
         {% if let Some(m_id) = match_id %}
@@ -81,7 +189,9 @@
           hx-get="/web/partials/analytics?actor_id={{ actor_id }}&player_id={{ player_id }}&match_id={{ m_id }}"
           hx-target="#analytics-panel"
           hx-swap="innerHTML"
-          class="min-h-[44px] px-3.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-semibold text-emerald-300"
+          hx-indicator="#drilldown-indicator"
+          onclick="setActiveDrilldown(this)"
+          class="drilldown-btn min-h-[40px] px-3.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-semibold text-emerald-300 transition active:scale-95 cursor-pointer"
         >
           Partida Atual
         </button>
@@ -89,7 +199,9 @@
           hx-get="/web/partials/analytics?actor_id={{ actor_id }}&player_id={{ player_id }}&match_id={{ m_id }}&set_number=1"
           hx-target="#analytics-panel"
           hx-swap="innerHTML"
-          class="min-h-[44px] px-3.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-semibold text-slate-200"
+          hx-indicator="#drilldown-indicator"
+          onclick="setActiveDrilldown(this)"
+          class="drilldown-btn min-h-[40px] px-3.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-semibold text-slate-200 transition active:scale-95 cursor-pointer"
         >
           Set 1
         </button>
@@ -97,7 +209,9 @@
           hx-get="/web/partials/analytics?actor_id={{ actor_id }}&player_id={{ player_id }}&match_id={{ m_id }}&set_number=2"
           hx-target="#analytics-panel"
           hx-swap="innerHTML"
-          class="min-h-[44px] px-3.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-semibold text-slate-200"
+          hx-indicator="#drilldown-indicator"
+          onclick="setActiveDrilldown(this)"
+          class="drilldown-btn min-h-[40px] px-3.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-semibold text-slate-200 transition active:scale-95 cursor-pointer"
         >
           Set 2
         </button>
@@ -105,13 +219,19 @@
           hx-get="/web/partials/compare?actor_id={{ actor_id }}&player_id={{ player_id }}&match_id={{ m_id }}&set_a=1&set_b=2"
           hx-target="#compare-panel"
           hx-swap="innerHTML"
-          class="min-h-[44px] px-3.5 py-2 rounded-lg bg-indigo-600/90 hover:bg-indigo-500 text-xs font-bold text-white"
+          hx-indicator="#drilldown-indicator"
+          class="min-h-[40px] px-3.5 py-2 rounded-lg bg-indigo-600/90 hover:bg-indigo-500 text-xs font-bold text-white transition active:scale-95 shadow-sm cursor-pointer"
         >
           ⚖️ Comparar Set 1 vs Set 2
         </button>
         {% endif %}
+
+        <span id="drilldown-indicator" class="htmx-indicator text-xs text-emerald-400 font-semibold flex items-center gap-1.5 ml-2">
+          <span>⏳</span> Atualizando estatísticas...
+        </span>
       </div>
     </section>
+    {% endif %}
 
     <!-- Painel Analítico Principal (Atualizável via HTMX) -->
     <section id="analytics-panel">
@@ -124,7 +244,246 @@
     </section>
   </main>
 
+  <!-- Modal de Preferências & Edição de Perfil -->
+  <div
+    id="preferences-modal"
+    class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm"
+  >
+    <div class="w-full max-w-lg bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 font-bold flex items-center justify-center text-sm">
+            ⚙️
+          </div>
+          <div>
+            <h3 class="text-sm font-extrabold text-white">Preferências da Conta</h3>
+            <p class="text-xs text-slate-400">Edite seu perfil e segurança de acesso</p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onclick="closePreferencesModal()"
+          class="text-slate-400 hover:text-white text-lg font-bold p-1 rounded-lg hover:bg-slate-800 cursor-pointer"
+          title="Fechar"
+        >
+          ✕
+        </button>
+      </div>
+
+      <!-- Abas de Navegação das Preferências -->
+      <div class="flex border-b border-slate-800 gap-2 text-xs">
+        <button
+          type="button"
+          id="tab-profile-btn"
+          onclick="switchPreferencesTab('profile')"
+          class="px-3.5 py-2 font-bold text-emerald-400 border-b-2 border-emerald-400 cursor-pointer"
+        >
+          👤 Meus Dados
+        </button>
+        <button
+          type="button"
+          id="tab-password-btn"
+          onclick="switchPreferencesTab('password')"
+          class="px-3.5 py-2 font-bold text-slate-400 hover:text-slate-200 border-b-2 border-transparent cursor-pointer"
+        >
+          🔒 Alterar Senha
+        </button>
+      </div>
+
+      <!-- Painel 1: Dados do Perfil -->
+      <div id="tab-profile-content" class="space-y-4">
+        <div id="profile-feedback"></div>
+        <form
+          hx-post="/web/preferences/profile"
+          hx-target="#profile-feedback"
+          hx-swap="innerHTML"
+          class="space-y-3.5"
+        >
+          <div>
+            <label class="block text-xs font-bold uppercase text-slate-400 mb-1" for="pref-name">Nome Completo</label>
+            <input
+              id="pref-name"
+              type="text"
+              name="name"
+              value="{{ user_name }}"
+              required
+              class="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-700 text-sm text-white focus:border-emerald-400 focus:outline-none"
+            />
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold uppercase text-slate-400 mb-1" for="pref-side">Posição Preferida em Quadra</label>
+            <select
+              id="pref-side"
+              name="preferred_side"
+              class="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-700 text-sm text-white focus:border-emerald-400 focus:outline-none"
+            >
+              <option value="right" {% if user_preferred_side_key == "right" %}selected{% endif %}>
+                Direita (Drive)
+              </option>
+              <option value="left" {% if user_preferred_side_key == "left" %}selected{% endif %}>
+                Esquerda (Revés)
+              </option>
+              <option value="both" {% if user_preferred_side_key == "both" %}selected{% endif %}>
+                Ambos os Lados
+              </option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold uppercase text-slate-400 mb-1" for="pref-whatsapp">WhatsApp (Opcional)</label>
+            <input
+              id="pref-whatsapp"
+              type="tel"
+              name="whatsapp_phone"
+              value="{{ user_whatsapp }}"
+              placeholder="(11) 98765-4321"
+              class="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-700 text-sm text-white focus:border-emerald-400 focus:outline-none"
+            />
+          </div>
+
+          <div class="pt-2 flex justify-end gap-2">
+            <button
+              type="button"
+              onclick="closePreferencesModal()"
+              class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300 cursor-pointer"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 font-bold text-xs text-white shadow-sm cursor-pointer"
+            >
+              Salvar Alterações
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Painel 2: Troca de Senha -->
+      <div id="tab-password-content" class="hidden space-y-4">
+        <div id="password-feedback"></div>
+        <form
+          hx-post="/web/preferences/password"
+          hx-target="#password-feedback"
+          hx-swap="innerHTML"
+          class="space-y-3.5"
+        >
+          <div>
+            <label class="block text-xs font-bold uppercase text-slate-400 mb-1" for="pref-curr-pass">Senha Atual</label>
+            <input
+              id="pref-curr-pass"
+              type="password"
+              name="current_password"
+              required
+              minlength="12"
+              class="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-700 text-sm text-white focus:border-emerald-400 focus:outline-none"
+            />
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold uppercase text-slate-400 mb-1" for="pref-new-pass">Nova Senha (12+ caracteres)</label>
+            <input
+              id="pref-new-pass"
+              type="password"
+              name="new_password"
+              required
+              minlength="12"
+              placeholder="Pelo menos 12 caracteres, maiúscula, minúscula, número e símbolo"
+              class="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-700 text-sm text-white focus:border-emerald-400 focus:outline-none"
+            />
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold uppercase text-slate-400 mb-1" for="pref-conf-pass">Confirmar Nova Senha</label>
+            <input
+              id="pref-conf-pass"
+              type="password"
+              name="confirm_password"
+              required
+              minlength="12"
+              class="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-700 text-sm text-white focus:border-emerald-400 focus:outline-none"
+            />
+          </div>
+
+          <div class="pt-2 flex justify-end gap-2">
+            <button
+              type="button"
+              onclick="closePreferencesModal()"
+              class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300 cursor-pointer"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 font-bold text-xs text-white shadow-sm cursor-pointer"
+            >
+              Atualizar Senha
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
   <script>
+    function toggleUserMenu() {
+      const menu = document.getElementById('user-menu-dropdown');
+      if (menu) menu.classList.toggle('hidden');
+    }
+
+    document.addEventListener('click', function(e) {
+      const btn = document.getElementById('user-menu-btn');
+      const menu = document.getElementById('user-menu-dropdown');
+      if (btn && menu && !btn.contains(e.target) && !menu.contains(e.target)) {
+        menu.classList.add('hidden');
+      }
+    });
+
+    function openPreferencesModal() {
+      const modal = document.getElementById('preferences-modal');
+      const menu = document.getElementById('user-menu-dropdown');
+      if (menu) menu.classList.add('hidden');
+      if (modal) modal.classList.remove('hidden');
+    }
+
+    function closePreferencesModal() {
+      const modal = document.getElementById('preferences-modal');
+      if (modal) modal.classList.add('hidden');
+    }
+
+    function switchPreferencesTab(tab) {
+      const profileBtn = document.getElementById('tab-profile-btn');
+      const passBtn = document.getElementById('tab-password-btn');
+      const profileContent = document.getElementById('tab-profile-content');
+      const passContent = document.getElementById('tab-password-content');
+
+      if (tab === 'profile') {
+        profileBtn.className = 'px-3.5 py-2 font-bold text-emerald-400 border-b-2 border-emerald-400 cursor-pointer';
+        passBtn.className = 'px-3.5 py-2 font-bold text-slate-400 hover:text-slate-200 border-b-2 border-transparent cursor-pointer';
+        profileContent.classList.remove('hidden');
+        passContent.classList.add('hidden');
+      } else {
+        passBtn.className = 'px-3.5 py-2 font-bold text-emerald-400 border-b-2 border-emerald-400 cursor-pointer';
+        profileBtn.className = 'px-3.5 py-2 font-bold text-slate-400 hover:text-slate-200 border-b-2 border-transparent cursor-pointer';
+        passContent.classList.remove('hidden');
+        profileContent.classList.add('hidden');
+      }
+    }
+
+    function setActiveDrilldown(btn) {
+      document.querySelectorAll('.drilldown-btn').forEach(b => {
+        b.className = 'drilldown-btn min-h-[40px] px-3.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-semibold text-slate-300 transition active:scale-95 cursor-pointer';
+        const badge = b.querySelector('span');
+        if (badge) badge.remove();
+      });
+      btn.className = 'drilldown-btn min-h-[40px] px-3.5 py-2 rounded-lg bg-emerald-600 text-white font-extrabold shadow-sm border border-emerald-500 ring-2 ring-emerald-500/30 transition active:scale-95 cursor-pointer';
+      const badge = document.createElement('span');
+      badge.className = 'ml-1 text-[10px] bg-emerald-700 px-1.5 py-0.5 rounded font-bold uppercase';
+      badge.textContent = 'Ativo';
+      btn.appendChild(badge);
+    }
+
     function renderPadelRadar() {
       const canvas = document.getElementById('padelRadarChart');
       if (!canvas || typeof Chart === 'undefined') return;
@@ -158,6 +517,9 @@
             backgroundColor: 'rgba(16, 185, 129, 0.22)',
             borderColor: 'rgb(16, 185, 129)',
             pointBackgroundColor: 'rgb(52, 211, 153)',
+            pointBorderColor: '#ffffff',
+            pointHoverBackgroundColor: '#ffffff',
+            pointHoverBorderColor: 'rgb(52, 211, 153)',
             borderWidth: 2
           }]
         },
@@ -169,13 +531,20 @@
               min: 0,
               max: 100,
               ticks: { stepSize: 25, color: '#94a3b8', backdropColor: 'transparent' },
-              grid: { color: 'rgba(148, 163, 184, 0.2)' },
+              grid: { color: 'rgba(148, 163, 184, 0.15)' },
               angleLines: { color: 'rgba(148, 163, 184, 0.2)' },
               pointLabels: { color: '#e2e8f0', font: { size: 11, weight: 'bold' } }
             }
           },
           plugins: {
-            legend: { display: false }
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  return ' ' + context.label + ': ' + context.raw + '%';
+                }
+              }
+            }
           }
         }
       });
@@ -186,3 +555,4 @@
   </script>
 </body>
 </html>
+

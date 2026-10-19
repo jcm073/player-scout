@@ -572,6 +572,7 @@ fn test_registration_blocks_admin_privilege_escalation_and_bola_actor_resolution
     // 2. Proteção Anti-Spoofing (BOLA): Player/Coach não podem falsificar actor_id de terceiros
     let now = Utc::now();
     let player_user = User::new_player("Atleta A", "a@padel.com", "hash");
+    assert!(player_user.is_active);
     let other_user_id = Uuid::now_v7();
     let session = UserSession {
         id: Uuid::now_v7(),

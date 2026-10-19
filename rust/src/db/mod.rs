@@ -94,6 +94,7 @@ impl Database {
             password_hash: password_hash,
             failed_login_attempts: 0,
             locked_until_epoch: None,
+            is_active: true,
         })
         .exec(&mut db)
         .await?;
@@ -159,6 +160,7 @@ impl Database {
             password_hash: validated.password_hash,
             failed_login_attempts: 0,
             locked_until_epoch: None,
+            is_active: true,
         })
         .exec(&mut db)
         .await?;
@@ -212,6 +214,14 @@ impl Database {
                 "E-mail ou senha inválidos".to_string(),
             ));
         };
+
+        // Verifica se a conta está desativada (Soft Delete)
+        if !user_rec.is_active {
+            return Err(AppError::Forbidden(
+                "Conta de usuário desativada. Entre em contato com o suporte ou administrador."
+                    .to_string(),
+            ));
+        }
 
         let now_epoch = Utc::now().timestamp();
         let locked_until = user_rec.locked_until_epoch.unwrap_or(0);
@@ -425,6 +435,56 @@ impl Database {
         Ok((updated_user, raw_token, session))
     }
 
+    /// Atualiza os dados cadastrais e preferências de quadra do usuário:
+    /// - Nome e Posição Preferida em quadra (`Direita (Drive)` ou `Esquerda (Revés)`)
+    /// - Se o usuário for um `Player`, sincroniza automaticamente seu perfil esportivo em `players`
+    pub async fn update_user_profile(
+        &self,
+        user_id: Uuid,
+        name: &str,
+        preferred_side: PreferredSide,
+        whatsapp_phone: Option<String>,
+    ) -> Result<User> {
+        let trimmed_name = name.trim();
+        if trimmed_name.is_empty() {
+            return Err(AppError::BadRequest(
+                "O nome não pode ser vazio".to_string(),
+            ));
+        }
+
+        let mut db = self.inner.clone();
+        let mut user_rec = UserRecord::get_by_id(&mut db, &user_id)
+            .await
+            .map_err(|_| {
+                AppError::NotFound(format!("Usuário com ID '{user_id}' não encontrado"))
+            })?;
+
+        user_rec
+            .update()
+            .name(trimmed_name.to_string())
+            .preferred_side(preferred_side)
+            .whatsapp_phone(whatsapp_phone)
+            .exec(&mut db)
+            .await?;
+
+        // Se o usuário possui um perfil esportivo em `players`, sincroniza nome e posição
+        let player_records = PlayerRecord::filter(PlayerRecord::fields().user_id().eq(user_id))
+            .exec(&mut db)
+            .await
+            .unwrap_or_default();
+
+        for mut player in player_records {
+            let _ = player
+                .update()
+                .name(trimmed_name.to_string())
+                .preferred_side(preferred_side)
+                .exec(&mut db)
+                .await;
+        }
+
+        Ok(User::from(user_rec))
+    }
+
     /// Busca um usuário utilizando CPF ou E-mail como chave única de identificação
     pub async fn find_user_by_key(&self, email: Option<&str>, cpf: Option<&str>) -> Result<User> {
         let users = self.list_users().await?;
@@ -550,6 +610,14 @@ impl Database {
             (u_rec, UserOAuthAccount::from(created_link))
         };
 
+        // Verifica se a conta está desativada (Soft Delete)
+        if !user_rec.is_active {
+            return Err(AppError::Forbidden(
+                "Conta de usuário desativada. Entre em contato com o suporte ou administrador."
+                    .to_string(),
+            ));
+        }
+
         // Verifica se a conta está temporariamente bloqueada por força bruta
         let now_epoch = Utc::now().timestamp();
         let locked_until = user_rec.locked_until_epoch.unwrap_or(0);
@@ -600,6 +668,40 @@ impl Database {
             .await?;
 
         Ok(records.into_iter().map(User::from).collect())
+    }
+
+    /// Desativa logicamente a conta de um usuário (Soft Delete):
+    /// - Marca `is_active = false` sem excluir dados físicos, partidas ou estatísticas
+    /// - Revoga imediatamente qualquer sessão ativa do usuário
+    pub async fn deactivate_user(&self, user_id: Uuid) -> Result<User> {
+        let mut db = self.inner.clone();
+        let mut user_rec = UserRecord::get_by_id(&mut db, &user_id)
+            .await
+            .map_err(|_| {
+                AppError::NotFound(format!("Usuário com ID '{user_id}' não encontrado"))
+            })?;
+
+        user_rec.update().is_active(false).exec(&mut db).await?;
+
+        // Revoga sessões ativas do usuário imediatamente
+        let _ = self.revoke_session_by_user_id(user_id).await;
+
+        Ok(User::from(user_rec))
+    }
+
+    /// Reativa logicamente a conta de um usuário desativado:
+    /// - Marca `is_active = true`, permitindo novos logins
+    pub async fn reactivate_user(&self, user_id: Uuid) -> Result<User> {
+        let mut db = self.inner.clone();
+        let mut user_rec = UserRecord::get_by_id(&mut db, &user_id)
+            .await
+            .map_err(|_| {
+                AppError::NotFound(format!("Usuário com ID '{user_id}' não encontrado"))
+            })?;
+
+        user_rec.update().is_active(true).exec(&mut db).await?;
+
+        Ok(User::from(user_rec))
     }
 
     // =========================================================================
@@ -862,6 +964,15 @@ impl Database {
         let mut db = self.inner.clone();
         let rec = MatchRecord::get_by_id(&mut db, &match_id).await?;
         Ok(MatchSession::from(rec))
+    }
+
+    pub async fn list_matches_for_player(&self, player_id: Uuid) -> Result<Vec<MatchSession>> {
+        let mut db = self.inner.clone();
+        let records = MatchRecord::filter(MatchRecord::fields().player_id().eq(player_id))
+            .order_by(MatchRecord::fields().id().desc())
+            .exec(&mut db)
+            .await?;
+        Ok(records.into_iter().map(MatchSession::from).collect())
     }
 }
 

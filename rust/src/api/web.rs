@@ -2,7 +2,7 @@ use askama::Template;
 use axum::{
     Extension, Form,
     extract::{Path, Query, State},
-    http::{HeaderMap, HeaderValue, header},
+    http::{HeaderMap, HeaderName, HeaderValue, StatusCode, header},
     response::{Html, IntoResponse, Redirect, Response},
 };
 use serde::Deserialize;
@@ -17,15 +17,17 @@ use crate::{
     db::{Database, NewShotInput},
     domain::{
         AnalyticsComparisonReport, AnalyticsFilter, AuthenticatedUser, DecisionQuality,
-        OAuthProvider, PlayerAnalyticsReport, RegistrationInput, ShotEvent, ShotOutcome, ShotType,
-        SpecialTag,
+        MatchSession, OAuthProvider, Player, PlayerAnalyticsReport, PreferredSide,
+        RegistrationInput, ShotEvent, ShotOutcome, ShotType, SpecialTag,
     },
     error::{AppError, Result},
 };
 
 #[derive(Template)]
 #[template(path = "login.html")]
-pub struct LoginTemplate {}
+pub struct LoginTemplate {
+    pub error: Option<String>,
+}
 
 #[derive(Template)]
 #[template(path = "register.html")]
@@ -57,11 +59,67 @@ pub struct CourtFeedTemplate {
 #[template(path = "dashboard.html")]
 pub struct DashboardTemplate {
     pub actor_id: Uuid,
+    pub user_name: String,
+    pub user_email: String,
+    pub user_role: String,
+    pub user_preferred_side: String,
+    pub user_preferred_side_key: String,
+    pub user_whatsapp: String,
+    pub user_initials: String,
+    pub can_write_shots: bool,
     pub player_id: Uuid,
-    pub match_id: Option<Uuid>,
     pub player_name: String,
+    pub player_side: String,
+    pub has_valid_player: bool,
+    pub match_id: Option<Uuid>,
+    pub matches: Vec<MatchSession>,
+    pub available_players: Vec<Player>,
     pub analytics_html: String,
     pub compare_html: String,
+}
+
+impl DashboardTemplate {
+    pub fn is_selected_player(&self, id: &Uuid) -> bool {
+        self.player_id == *id
+    }
+
+    pub fn is_selected_match(&self, id: &Uuid) -> bool {
+        self.match_id.as_ref() == Some(id)
+    }
+
+    pub fn is_career_scope(&self) -> bool {
+        self.match_id.is_none()
+    }
+}
+
+pub fn calculate_initials(name: &str) -> String {
+    let parts: Vec<&str> = name.split_whitespace().collect();
+    if parts.is_empty() {
+        "PS".to_string()
+    } else if parts.len() == 1 {
+        parts[0].chars().take(2).collect::<String>().to_uppercase()
+    } else {
+        format!(
+            "{}{}",
+            parts[0].chars().next().unwrap_or('P'),
+            parts[parts.len() - 1].chars().next().unwrap_or('S')
+        )
+        .to_uppercase()
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UpdateProfileForm {
+    pub name: String,
+    pub preferred_side: PreferredSide,
+    pub whatsapp_phone: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UpdatePasswordForm {
+    pub current_password: String,
+    pub new_password: String,
+    pub confirm_password: String,
 }
 
 #[derive(Template)]
@@ -134,9 +192,40 @@ pub async fn dashboard_page(
     Query(query): Query<WebDashboardQuery>,
 ) -> Result<Html<String>> {
     let actor_id = auth_user.resolve_actor_id(query.actor_id)?;
+    let user_name = auth_user.user.name.clone();
+    let user_email = auth_user.user.email.clone();
+    let user_role = auth_user.user.role.as_str().to_string();
+    let user_preferred_side = auth_user.user.preferred_side.label_pt().to_string();
+    let user_preferred_side_key = auth_user.user.preferred_side.as_str().to_string();
+    let user_whatsapp = auth_user.user.whatsapp_phone.clone().unwrap_or_default();
+    let user_initials = calculate_initials(&user_name);
+    let can_write_shots = auth_user.user.role.can_write_shots();
 
-    if let Some(player_id) = query.player_id {
-        let player = db.verify_player_read_access(actor_id, player_id).await?;
+    // 1. Resolve os atletas disponíveis para este usuário autenticado
+    let available_players = db
+        .list_players_for_actor(actor_id)
+        .await
+        .unwrap_or_default();
+
+    // 2. Determina o jogador ativo:
+    //    - Se query.player_id foi informado (e não é nil), valida o acesso de leitura
+    //    - Caso contrário, seleciona o primeiro atleta da lista de disponíveis (se houver)
+    let resolved_player = if let Some(pid) = query.player_id.filter(|id| !id.is_nil()) {
+        db.verify_player_read_access(actor_id, pid).await.ok()
+    } else {
+        available_players.first().cloned()
+    };
+
+    if let Some(player) = resolved_player {
+        let player_id = player.id;
+        let player_name = player.name.clone();
+        let player_side = player.preferred_side.label_pt().to_string();
+
+        let matches = db
+            .list_matches_for_player(player_id)
+            .await
+            .unwrap_or_default();
+
         let filter = AnalyticsFilter {
             match_id: query.match_id,
             set_number: query.set_number,
@@ -177,9 +266,21 @@ pub async fn dashboard_page(
 
         let html = DashboardTemplate {
             actor_id,
+            user_name,
+            user_email,
+            user_role,
+            user_preferred_side,
+            user_preferred_side_key,
+            user_whatsapp,
+            user_initials,
+            can_write_shots,
             player_id,
+            player_name,
+            player_side,
+            has_valid_player: true,
             match_id: query.match_id,
-            player_name: player.name,
+            matches,
+            available_players,
             analytics_html,
             compare_html,
         }
@@ -188,7 +289,7 @@ pub async fn dashboard_page(
         return Ok(Html(html));
     }
 
-    // Modo inicial sem player_id selecionado (exibição de estrutura vazia com o ator autenticado)
+    // Modo sem atleta vinculado (ex: treinador recém-cadastrado sem atletas vinculados ainda)
     let nil_id = Uuid::nil();
     let empty_report = PlayerAnalyticsReport::from_events(nil_id, AnalyticsFilter::default(), &[]);
     let analytics_html = AnalyticsPanelTemplate {
@@ -198,9 +299,21 @@ pub async fn dashboard_page(
 
     let html = DashboardTemplate {
         actor_id,
+        user_name,
+        user_email,
+        user_role,
+        user_preferred_side,
+        user_preferred_side_key,
+        user_whatsapp,
+        user_initials,
+        can_write_shots,
         player_id: nil_id,
+        player_name: "Nenhum atleta vinculado".to_string(),
+        player_side: "Drive / Revés".to_string(),
+        has_valid_player: false,
         match_id: None,
-        player_name: "Atleta Demonstração (Informe actor_id e player_id)".to_string(),
+        matches: Vec::new(),
+        available_players: Vec::new(),
         analytics_html,
         compare_html: String::new(),
     }
@@ -427,9 +540,59 @@ async fn build_court_feed_html(
 }
 
 /// Renderiza a Tela de Login (`GET /web/login`)
-pub async fn login_page() -> Result<Html<String>> {
-    let html = LoginTemplate {}.render()?;
+pub async fn login_page(
+    Query(query): Query<std::collections::HashMap<String, String>>,
+) -> Result<Html<String>> {
+    let error = match query.get("reason").map(String::as_str) {
+        Some("session_required") => {
+            Some("Sessão obrigatória ou expirada. Faça login para continuar.".to_string())
+        }
+        _ => None,
+    };
+    let html = LoginTemplate { error }.render()?;
     Ok(Html(html))
+}
+
+/// Processa Login por Formulário Web Padrão (`POST /web/login`)
+/// - Redireciona imediatamente para o Dashboard Analítico (HTTP 303 See Other)
+/// - Emite o cookie HttpOnly `ps_session` com duração de 12 horas
+/// - Em caso de credenciais inválidas, recarrega o formulário exibindo a mensagem de erro
+pub async fn web_login(State(db): State<Database>, Form(form): Form<LoginRequest>) -> Response {
+    match db.authenticate_by_email(&form.email, &form.password).await {
+        Ok((user, player_profile, session_token, _session)) => {
+            let dashboard_link = if let Some(player) = &player_profile {
+                format!(
+                    "/web/dashboard?actor_id={}&player_id={}",
+                    user.id, player.id
+                )
+            } else {
+                format!("/web/dashboard?actor_id={}&player_id={}", user.id, user.id)
+            };
+
+            let mut headers = HeaderMap::new();
+            if let Ok(cookie_val) = HeaderValue::from_str(&build_session_cookie(&session_token)) {
+                headers.insert(header::SET_COOKIE, cookie_val);
+            }
+            if let Ok(loc) = HeaderValue::from_str(&dashboard_link) {
+                headers.insert(header::LOCATION, loc.clone());
+                headers.insert(HeaderName::from_static("hx-redirect"), loc);
+            }
+            append_security_headers(&mut headers);
+
+            (StatusCode::SEE_OTHER, headers).into_response()
+        }
+        Err(err) => {
+            let html = LoginTemplate {
+                error: Some(format!("Falha no login: {err}")),
+            }
+            .render()
+            .unwrap_or_default();
+
+            let mut headers = HeaderMap::new();
+            append_security_headers(&mut headers);
+            (StatusCode::UNAUTHORIZED, headers, Html(html)).into_response()
+        }
+    }
 }
 
 /// Renderiza a Tela de Cadastro Completo (`GET /web/register`)
@@ -440,13 +603,13 @@ pub async fn register_page() -> Result<Html<String>> {
 
 /// Fragmento HTMX: Processa Login por E-mail (`POST /web/partials/auth/login`)
 /// - Emite o cookie HttpOnly `ps_session` com duração de 12 horas
-/// - Substitui e exclui qualquer sessão anterior do mesmo usuário (sessão única)
+/// - Redireciona instantaneamente o cliente sem exibir banner intermediário
 pub async fn web_login_partial(
     State(db): State<Database>,
     Form(form): Form<LoginRequest>,
 ) -> Result<Response> {
     match db.authenticate_by_email(&form.email, &form.password).await {
-        Ok((user, player_profile, session_token, session)) => {
+        Ok((user, player_profile, session_token, _session)) => {
             let dashboard_link = if let Some(player) = &player_profile {
                 format!(
                     "/web/dashboard?actor_id={}&player_id={}",
@@ -456,27 +619,21 @@ pub async fn web_login_partial(
                 format!("/web/dashboard?actor_id={}&player_id={}", user.id, user.id)
             };
 
-            let html = format!(
-                r#"<div class="p-4 rounded-xl bg-emerald-950/80 border border-emerald-700 text-emerald-200 text-xs space-y-2">
-                    <div class="font-extrabold text-sm text-emerald-300">✅ Login autenticado com sucesso!</div>
-                    <div>Bem-vindo(a), <strong>{}</strong> (Perfil: <code>{}</code> · Posição: <code>{}</code>).</div>
-                    <div class="text-[11px] text-emerald-400/90">🔒 Sessão única ativa por <strong>12 horas</strong> (expira em <code>{}</code>).</div>
-                    <div class="pt-1">
-                      <a href="{}" class="inline-block px-3.5 py-2 rounded-lg bg-emerald-600 text-white font-bold">Acessar Dashboard Analítico →</a>
-                    </div>
-                </div>"#,
-                user.name,
-                user.role.as_str(),
-                user.preferred_side.label_pt(),
-                session.expires_at.format("%d/%m/%Y %H:%M UTC"),
-                dashboard_link
-            );
-
             let mut headers = HeaderMap::new();
             if let Ok(cookie_val) = HeaderValue::from_str(&build_session_cookie(&session_token)) {
                 headers.insert(header::SET_COOKIE, cookie_val);
             }
+            if let Ok(redirect_val) = HeaderValue::from_str(&dashboard_link) {
+                headers.insert(header::LOCATION, redirect_val.clone());
+                headers.insert(HeaderName::from_static("hx-redirect"), redirect_val);
+            }
             append_security_headers(&mut headers);
+
+            // Redirecionamento automático sem exibir mensagem intermediária verde
+            let html = format!(
+                r#"<script>window.location.replace("{}");</script>"#,
+                dashboard_link
+            );
 
             Ok((headers, Html(html)).into_response())
         }
@@ -499,10 +656,9 @@ pub async fn web_register_partial(
 ) -> Result<Response> {
     match db.register_user_with_profile(form).await {
         Ok((user, player_profile)) => {
-            let (session_token, _session) = db.create_or_replace_session(user.id).await?;
             let profile_note = if let Some(player) = &player_profile {
                 format!(
-                    "Perfil de Atleta vinculado automaticamente (ID: <code>{}</code>, Posição: <strong>{}</strong>).",
+                    "Perfil de Atleta vinculado com sucesso (ID: <code>{}</code>, Posição: <strong>{}</strong>).",
                     player.id,
                     player.preferred_side.label_pt()
                 )
@@ -518,8 +674,9 @@ pub async fn web_register_partial(
                     <div class="font-extrabold text-sm text-emerald-300">✅ Cadastro concluído com sucesso!</div>
                     <div>Usuário: <strong>{}</strong> · CPF: <code>{}</code> · E-mail: <code>{}</code></div>
                     <div>{}</div>
+                    <div class="text-[11px] text-emerald-400/90">Faça login com seu e-mail e senha para acessar o sistema.</div>
                     <div class="pt-1">
-                      <a href="/web/login" class="inline-block px-3.5 py-2 rounded-lg bg-emerald-600 text-white font-bold">Ir para o Login →</a>
+                      <a href="/web/login" class="inline-block px-3.5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold transition">Ir para o Login →</a>
                     </div>
                 </div>"#,
                 user.name,
@@ -529,9 +686,6 @@ pub async fn web_register_partial(
             );
 
             let mut headers = HeaderMap::new();
-            if let Ok(cookie_val) = HeaderValue::from_str(&build_session_cookie(&session_token)) {
-                headers.insert(header::SET_COOKIE, cookie_val);
-            }
             append_security_headers(&mut headers);
 
             Ok((headers, Html(html)).into_response())
@@ -704,5 +858,91 @@ pub async fn web_oauth_callback(
             Ok(resp)
         }
         Err(err) => Err(err),
+    }
+}
+
+/// Fragmento HTMX: Atualiza Dados Cadastrais / Preferências do Usuário (`POST /web/preferences/profile`)
+pub async fn web_update_profile(
+    State(db): State<Database>,
+    Extension(auth_user): Extension<AuthenticatedUser>,
+    Form(form): Form<UpdateProfileForm>,
+) -> Result<Html<String>> {
+    let clean_whatsapp = form.whatsapp_phone.filter(|s| !s.trim().is_empty());
+    match db
+        .update_user_profile(
+            auth_user.user.id,
+            &form.name,
+            form.preferred_side,
+            clean_whatsapp,
+        )
+        .await
+    {
+        Ok(user) => {
+            let html = format!(
+                r#"<div class="p-3.5 rounded-xl bg-emerald-950/80 border border-emerald-700 text-emerald-200 text-xs flex items-center justify-between">
+                    <span>✅ Preferências salvas: <strong>{}</strong> (Posição: <strong>{}</strong>). Recarregando...</span>
+                    <button type="button" onclick="window.location.reload()" class="px-2.5 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] transition">Recarregar</button>
+                </div>
+                <script>setTimeout(() => window.location.reload(), 1200);</script>"#,
+                user.name,
+                user.preferred_side.label_pt()
+            );
+            Ok(Html(html))
+        }
+        Err(err) => {
+            let html = format!(
+                r#"<div class="p-3.5 rounded-xl bg-rose-950/80 border border-rose-700 text-rose-200 text-xs font-semibold">
+                    ❌ Erro ao atualizar perfil: {}
+                </div>"#,
+                err
+            );
+            Ok(Html(html))
+        }
+    }
+}
+
+/// Fragmento HTMX: Atualiza Senha do Usuário com Rotação de Sessão (`POST /web/preferences/password`)
+pub async fn web_update_password(
+    State(db): State<Database>,
+    Extension(auth_user): Extension<AuthenticatedUser>,
+    Form(form): Form<UpdatePasswordForm>,
+) -> Result<Response> {
+    if form.new_password != form.confirm_password {
+        let html = r#"<div class="p-3.5 rounded-xl bg-rose-950/80 border border-rose-700 text-rose-200 text-xs font-semibold">
+            ❌ A confirmação da nova senha não confere.
+        </div>"#;
+        return Ok(Html(html.to_string()).into_response());
+    }
+
+    match db
+        .change_user_password(
+            auth_user.user.id,
+            &form.current_password,
+            &form.new_password,
+        )
+        .await
+    {
+        Ok((_user, new_token, _session)) => {
+            let html = r#"<div class="p-3.5 rounded-xl bg-emerald-950/80 border border-emerald-700 text-emerald-200 text-xs font-semibold">
+                ✅ Senha alterada com sucesso! Sessão renovada com segurança.
+            </div>"#;
+
+            let mut headers = HeaderMap::new();
+            if let Ok(cookie_val) = HeaderValue::from_str(&build_session_cookie(&new_token)) {
+                headers.insert(header::SET_COOKIE, cookie_val);
+            }
+            append_security_headers(&mut headers);
+
+            Ok((headers, Html(html.to_string())).into_response())
+        }
+        Err(err) => {
+            let html = format!(
+                r#"<div class="p-3.5 rounded-xl bg-rose-950/80 border border-rose-700 text-rose-200 text-xs font-semibold">
+                    ❌ Falha ao alterar senha: {}
+                </div>"#,
+                err
+            );
+            Ok(Html(html).into_response())
+        }
     }
 }
