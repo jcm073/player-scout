@@ -1,6 +1,7 @@
 pub mod analytics;
 pub mod auth;
 pub mod match_session;
+pub mod oauth;
 pub mod player;
 pub mod shot;
 pub mod user;
@@ -8,6 +9,7 @@ pub mod user;
 pub use analytics::*;
 pub use auth::*;
 pub use match_session::*;
+pub use oauth::*;
 pub use player::*;
 pub use shot::*;
 pub use user::*;
