@@ -33,6 +33,9 @@ thiserror = "2.0"
 uuid = { version = "1.13", features = ["v4", "v7", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
 
+# Cliente HTTP Assíncrono para OAuth2 / OpenID Connect (Google/OIDC)
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+
 # Segurança e Hashing de Senhas (Argon2i - RustCrypto)
 argon2 = { version = "0.5.3", features = ["std"] }
 rand_core = { version = "0.6", features = ["getrandom"] }

@@ -6,6 +6,9 @@ pub struct AppConfig {
     pub server_host: String,
     pub server_port: u16,
     pub rust_log: String,
+    pub oauth_google_client_id: Option<String>,
+    pub oauth_google_client_secret: Option<String>,
+    pub oauth_google_redirect_uri: Option<String>,
 }
 
 impl AppConfig {
@@ -33,11 +36,29 @@ impl AppConfig {
         let rust_log =
             std::env::var("RUST_LOG").unwrap_or_else(|_| "info,player_scout=debug".to_string());
 
+        let oauth_google_client_id = std::env::var("OAUTH_GOOGLE_CLIENT_ID")
+            .ok()
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty());
+
+        let oauth_google_client_secret = std::env::var("OAUTH_GOOGLE_CLIENT_SECRET")
+            .ok()
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty());
+
+        let oauth_google_redirect_uri = std::env::var("OAUTH_GOOGLE_REDIRECT_URI")
+            .ok()
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty());
+
         Ok(Self {
             database_url,
             server_host,
             server_port,
             rust_log,
+            oauth_google_client_id,
+            oauth_google_client_secret,
+            oauth_google_redirect_uri,
         })
     }
 

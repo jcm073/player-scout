@@ -106,6 +106,10 @@ pub struct RegistrationInput {
     #[serde(default)]
     pub dominant_hand: DominantHand,
     pub password: String,
+    #[serde(default)]
+    pub oauth_provider: Option<String>,
+    #[serde(default)]
+    pub oauth_provider_user_id: Option<String>,
 }
 
 /// Dados normalizados e validados prontos para persistência no banco de dados

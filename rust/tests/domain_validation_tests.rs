@@ -561,6 +561,8 @@ fn test_registration_blocks_admin_privilege_escalation_and_bola_actor_resolution
         preferred_side: PreferredSide::Left,
         dominant_hand: DominantHand::RightHanded,
         password: "Padel#2026StrongPass".to_string(),
+        oauth_provider: None,
+        oauth_provider_user_id: None,
     };
 
     let err = admin_reg
@@ -602,4 +604,68 @@ fn test_registration_blocks_admin_privilege_escalation_and_bola_actor_resolution
 
     // 3. Executa dummy Argon2i para garantir que não entra em pânico
     verify_dummy_password_argon2i("QualquerSenhaTentada123!");
+}
+
+#[tokio::test]
+async fn test_oauth2_providers_urls_and_profile_validation() {
+    // 1. Validação de URLs e especificações dos provedores (Google, Microsoft, Instagram)
+    let google = OAuthProvider::Google;
+    assert_eq!(google.as_str(), "google");
+    assert_eq!(google.display_name(), "Google (Gmail)");
+    assert_eq!(google.token_url(), "https://oauth2.googleapis.com/token");
+    assert_eq!(
+        google.userinfo_url(),
+        "https://openidconnect.googleapis.com/v1/userinfo"
+    );
+
+    let auth_url = google.authorize_url("client123", "http://localhost:3000/callback", "state789");
+    assert!(auth_url.contains("client_id=client123"));
+    assert!(auth_url.contains("state=state789"));
+    assert!(auth_url.contains("accounts.google.com/o/oauth2/v2/auth"));
+
+    let ms = OAuthProvider::Microsoft;
+    assert_eq!(ms.as_str(), "microsoft");
+    assert_eq!(ms.display_name(), "Microsoft Office");
+
+    let ig = OAuthProvider::Instagram;
+    assert_eq!(ig.as_str(), "instagram");
+    assert_eq!(ig.display_name(), "Instagram");
+
+    // 2. Validação de troca de código Google sem credenciais -> deve retornar erro interno claro
+    let http_client = reqwest::Client::new();
+    let exchange_err =
+        exchange_google_authorization_code(&http_client, "", "", "http://localhost", "fake_code")
+            .await;
+    assert!(exchange_err.is_err());
+    let err_str = exchange_err.unwrap_err().to_string();
+    assert!(err_str.contains("Credenciais Google OAuth2 não configuradas no ambiente"));
+
+    // 3. Validação de RegistrationInput com campos de auto-vinculação OAuth2
+    let reg_input = RegistrationInput {
+        first_name: "Carlos".to_string(),
+        last_name: "Alcaraz".to_string(),
+        age: 21,
+        cpf: "12345678909".to_string(),
+        email: "carlos@google.com".to_string(),
+        whatsapp_phone: "11999998888".to_string(),
+        cep: "01310-100".to_string(),
+        street: "Av Paulista".to_string(),
+        street_number: "1000".to_string(),
+        complement: "".to_string(),
+        neighborhood: "Bela Vista".to_string(),
+        city: "São Paulo".to_string(),
+        state: "SP".to_string(),
+        role: UserRole::Player,
+        preferred_side: PreferredSide::Right,
+        dominant_hand: DominantHand::RightHanded,
+        password: "ValidPassword123#".to_string(),
+        oauth_provider: Some("google".to_string()),
+        oauth_provider_user_id: Some("google-sub-123456".to_string()),
+    };
+
+    let validated = reg_input.validate_and_hash();
+    assert!(validated.is_ok());
+    let val = validated.unwrap();
+    assert_eq!(val.full_name, "Carlos Alcaraz");
+    assert_eq!(val.email, "carlos@google.com");
 }

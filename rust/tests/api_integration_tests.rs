@@ -879,6 +879,8 @@ async fn test_phase_4_5_registration_argon2i_login_cpf_lookup_and_oauth() {
         preferred_side: PreferredSide::Left,
         dominant_hand: DominantHand::RightHanded,
         password: "PadelMaster2026!#".to_string(),
+        oauth_provider: None,
+        oauth_provider_user_id: None,
     };
 
     let (status, player_auth): (StatusCode, AuthResponse) = send_json(
@@ -926,6 +928,8 @@ async fn test_phase_4_5_registration_argon2i_login_cpf_lookup_and_oauth() {
         preferred_side: PreferredSide::Right,
         dominant_hand: DominantHand::RightHanded,
         password: "CoachSecure2026$%".to_string(),
+        oauth_provider: None,
+        oauth_provider_user_id: None,
     };
 
     let (status, coach_auth): (StatusCode, AuthResponse) = send_json(
@@ -1137,17 +1141,48 @@ async fn test_phase_4_5_registration_argon2i_login_cpf_lookup_and_oauth() {
         .unwrap();
     let web_cb_new_res = app.clone().oneshot(web_cb_new_req).await.unwrap();
     assert_eq!(web_cb_new_res.status(), StatusCode::SEE_OTHER);
-    assert!(
-        web_cb_new_res
+    let web_cb_new_loc = web_cb_new_res
+        .headers()
+        .get("location")
+        .unwrap()
+        .to_str()
+        .unwrap();
+    assert!(web_cb_new_loc.starts_with("/web/register?email=novo.oauth."));
+    assert!(web_cb_new_loc.contains("oauth_provider=google"));
+    assert!(web_cb_new_loc.contains("provider_user_id=google_c1"));
+
+    // 8d. Tratamento de cancelamento pelo usuário no provedor (error=access_denied)
+    let web_cb_cancel_req = Request::builder()
+        .method(Method::GET)
+        .uri(format!(
+            "/web/auth/oauth/google/callback?error=access_denied&state={valid_state}"
+        ))
+        .header("cookie", format!("ps_oauth_state={valid_state}"))
+        .body(Body::empty())
+        .unwrap();
+    let web_cb_cancel_res = app.clone().oneshot(web_cb_cancel_req).await.unwrap();
+    assert_eq!(web_cb_cancel_res.status(), StatusCode::SEE_OTHER);
+    assert_eq!(
+        web_cb_cancel_res
             .headers()
             .get("location")
             .unwrap()
             .to_str()
-            .unwrap()
-            .starts_with("/web/register?email=novo.oauth.")
+            .unwrap(),
+        "/web/login?error=oauth_cancelled"
     );
 
-    // Callback Web para usuário já cadastrado -> emite cookie `ps_session` (12h) e redireciona para `/web/dashboard`
+    // 8e. Defesa Anti-CSRF: state divergente ou adulterado deve ser rejeitado com 403 Forbidden
+    let web_cb_tampered_req = Request::builder()
+        .method(Method::GET)
+        .uri("/web/auth/oauth/google/callback?code=c1&state=state_falsificado&email=qualquer@test.com")
+        .header("cookie", format!("ps_oauth_state={valid_state}"))
+        .body(Body::empty())
+        .unwrap();
+    let web_cb_tampered_res = app.clone().oneshot(web_cb_tampered_req).await.unwrap();
+    assert_eq!(web_cb_tampered_res.status(), StatusCode::FORBIDDEN);
+
+    // 8f. Callback Web para usuário já cadastrado -> emite cookie `ps_session` (12h) e redireciona para `/web/dashboard`
     let web_cb_ok_req = Request::builder()
         .method(Method::GET)
         .uri(format!(
@@ -1237,6 +1272,8 @@ async fn test_session_12h_single_session_logout_expiration_and_brute_force_prote
         preferred_side: PreferredSide::Right,
         dominant_hand: DominantHand::LeftHanded,
         password: password.clone(),
+        oauth_provider: None,
+        oauth_provider_user_id: None,
     };
 
     let (status, auth_1): (StatusCode, AuthResponse) = send_json_with_token(
@@ -1460,6 +1497,8 @@ async fn test_fase_4_7_security_rbac_bola_lgpd_password_rotation_and_csrf() {
         preferred_side: PreferredSide::Left,
         dominant_hand: DominantHand::RightHanded,
         password: "Padel#2026StrongPass".to_string(),
+        oauth_provider: None,
+        oauth_provider_user_id: None,
     };
     let (st_admin_reg, err_admin_reg): (StatusCode, ErrorResponse) = send_json_with_token(
         &app,
@@ -1498,6 +1537,8 @@ async fn test_fase_4_7_security_rbac_bola_lgpd_password_rotation_and_csrf() {
             preferred_side: PreferredSide::Right,
             dominant_hand: DominantHand::LeftHanded,
             password: player_a_pass.clone(),
+            oauth_provider: None,
+            oauth_provider_user_id: None,
         }),
     )
     .await;
@@ -1526,6 +1567,8 @@ async fn test_fase_4_7_security_rbac_bola_lgpd_password_rotation_and_csrf() {
             preferred_side: PreferredSide::Left,
             dominant_hand: DominantHand::RightHanded,
             password: "Padel#2026CoachBPass".to_string(),
+            oauth_provider: None,
+            oauth_provider_user_id: None,
         }),
     )
     .await;
@@ -1717,6 +1760,8 @@ async fn test_user_soft_delete_deactivation_and_reactivation() {
         preferred_side: PreferredSide::Right,
         dominant_hand: DominantHand::RightHanded,
         password: password.to_string(),
+        oauth_provider: None,
+        oauth_provider_user_id: None,
     };
 
     let (status, reg_auth): (StatusCode, AuthResponse) =
