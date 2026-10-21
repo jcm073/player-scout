@@ -11,6 +11,27 @@ O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.
 ## [Não lançado] - Unreleased
 
 ### Adicionado
+- **OpenAPI 3.1 & Swagger UI Integrado (`utoipa` v5.5 e `utoipa-swagger-ui` v9.0):**
+  - Integração da especificação formal OpenAPI 3.1 aos endpoints REST de `/api/v1` em Rust Axum.
+  - Interface interativa disponível em `http://localhost:3000/swagger-ui/` e especificação JSON em `http://localhost:3000/api-docs/openapi.json`.
+  - Mapeamento de esquemas com `#[derive(utoipa::ToSchema)]` e `#[derive(utoipa::IntoParams)]` para todos os 21 golpes do Padel, regras táticas, DTOs de autenticação, usuários, atletas, partidas e relatórios analíticos.
+  - Teste automatizado de integração `test_openapi_spec_and_swagger_ui_endpoints` validando contratos e resposta HTML do Swagger UI.
+- **Guia Passo a Passo de Onboarding para Desenvolvedores Juniores (`docs/ONBOARDING_JUNIOR.md`):**
+  - Glossário detalhado dos 21 golpes do Padel, Matriz Tática de Ouro (Decisão × Execução), setup local com Docker Compose (PostgreSQL 18) e Rust 1.99+ (Edition 2024).
+  - Diagrama de sequência Mermaid do ciclo de vida de uma requisição HTMX e "receita de bolo" em 5 passos para criação de novas funcionalidades.
+  - Guia de sobrevivência HTMX + Askama e rotina de comandos de verificação de qualidade (`cargo fmt`, `cargo clippy`, `cargo test`).
+  - Inclusão de referências cruzadas no `README.md`, `rust/src/lib.rs`, `docs/MODULARIZACAO_WEB.md` e `docs/MIGRATIONS_E_TOASTY_ORM.md`.
+- **Manual Técnico de Migrações SQL e Toasty ORM (`docs/MIGRATIONS_E_TOASTY_ORM.md`):**
+  - Catálogo completo das 7 migrações SQL (`001` a `007`) do PostgreSQL 18 e guia de evolução de esquemas.
+  - Instruções de mapeamento procedurais com `#[derive(toasty::Model)]`, conversões explícitas `From<*Record>` para o domínio puro e repositório `Database`.
+  - Docstrings de módulo `//!` detalhadas em `rust/src/db/mod.rs` e `rust/src/db/models.rs`.
+- **Modularização Arquitetural da Camada Web (`rust/src/api/web/`):**
+  - Decomposição do arquivo monolítico `rust/src/api/web.rs` (1.431 linhas) em 6 submódulos coesos: `auth.rs`, `dashboard.rs`, `court.rs`, `matches.rs`, `analytics.rs` e `preferences.rs`.
+  - Criação do documento arquitetural `docs/MODULARIZACAO_WEB.md` e docstring de crate em `rust/src/lib.rs`.
+- **Homologação e Implementação Completa do Google OAuth2 (OpenID Connect):**
+  - Integração HTTP assíncrona com `reqwest` (`rustls-tls`) sem dependências pesadas de JWT.
+  - Validação estrita do cookie HttpOnly Anti-CSRF `ps_oauth_state` (10 min) e troca segura de `code` por `access_token` e `id_token` na Google Accounts API.
+  - Auto-vinculação segura de contas OAuth2 por e-mail e emissão de sessão única de 12 horas com hash Argon2i (`ps_session`).
 - **Fase 4.8: Hub do Treinador, Ingestão Touch-First em 1 Clique Direto & Suporte Multi-Atletas (`match_players`):**
   - **Tabela Associativa `match_players` (Migração 007):** Persistência relacional de até 4 atletas escalados por partida com suporte a Dupla A (`team_a`), Dupla B (`team_b`), lados de quadra (`left`/`right`) e flag de scout ativo, evitando perda de estado ao atualizar ou sair da página.
   - **Mapeamento Toasty ORM & Repositório:** Adicionado `MatchPlayerRecord` em `models.rs`, registro no pool de conexões e métodos `assign_match_player`, `list_match_players`, `create_quick_player` e `finish_match`.

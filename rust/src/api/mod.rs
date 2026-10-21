@@ -11,6 +11,7 @@ use axum::{
     Router, middleware,
     routing::{get, post},
 };
+use tower_http::compression::CompressionLayer;
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
 use utoipa::OpenApi;
@@ -238,6 +239,7 @@ pub fn app_router(db: Database) -> Router {
         .merge(public_routes)
         .merge(protected_routes)
         .with_state(db)
+        .layer(CompressionLayer::new())
         .layer(TraceLayer::new_for_http())
         .layer(cors)
 }

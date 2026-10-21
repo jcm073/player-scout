@@ -13,12 +13,16 @@ path = "src/lib.rs"
 name = "player-scout"
 path = "src/main.rs"
 
+[[bin]]
+name = "seed"
+path = "src/bin/seed.rs"
+
 [dependencies]
 # Servidor HTTP & Roteamento (versão estável mais recente)
 axum = { version = "0.8.9", features = ["macros"] }
 tokio = { version = "1.43", features = ["full"] }
 tower = { version = "0.5", features = ["util"] }
-tower-http = { version = "0.6", features = ["cors", "trace", "fs"] }
+tower-http = { version = "0.6", features = ["cors", "trace", "fs", "compression-full"] }
 
 # ORM Assíncrono Tokio para PostgreSQL
 toasty = { version = "0.11.0", features = ["postgresql"] }

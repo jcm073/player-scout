@@ -151,13 +151,24 @@ cargo test --manifest-path rust/Cargo.toml --test domain_validation_tests
 cargo test --manifest-path rust/Cargo.toml --test api_integration_tests
 ```
 
-#### 5. Iniciar a Aplicação
+#### 5. Popular o Banco com Dados de Demonstração (Seed)
+Para não iniciar com o banco vazio e poder visualizar instantaneamente os gráficos do Chart.js, a tela de quadra e relatórios:
 ```bash
-cargo run --manifest-path rust/Cargo.toml
+make seed
+# Ou: cargo run --bin seed --manifest-path rust/Cargo.toml
+```
+> **Credenciais de teste geradas:**  
+> - **Treinador:** `treinador@padel.com` | **Senha:** `PadelScout#2026`  
+> - **Atletas criados:** Lucas Silva (Revés), Gabriel Santos (Drive), Matheus Oliveira (Drive) e Felipe Costa (Revés).
+
+#### 6. Iniciar a Aplicação
+```bash
+make dev
+# Ou: cargo run --manifest-path rust/Cargo.toml
 ```
 Acesse no seu navegador: **`http://localhost:3000`**.
 
-#### 6. Explorar a API via Swagger UI
+#### 7. Explorar a API via Swagger UI
 Com a aplicação em execução, você pode inspecionar e testar interativamente todos os endpoints REST de `/api/v1`:
 - 📖 **Swagger UI Interativo:** **`http://localhost:3000/swagger-ui/`**
 - 📄 **Especificação OpenAPI 3.1 JSON:** **`http://localhost:3000/api-docs/openapi.json`** (usado pelo time mobile para gerar automaticamente os modelos e clientes em Kotlin).
