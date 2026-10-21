@@ -1,3 +1,20 @@
+//! # Camada de Persistência & Repositório (Toasty ORM + PostgreSQL 18)
+//!
+//! Este módulo gerencia o pool de conexões assíncronas, o mapeamento de tabelas e o repositório
+//! centralizado de consultas sobre o banco relacional **PostgreSQL 18** utilizando o **Toasty ORM**.
+//!
+//! ## Arquitetura de Persistência
+//! - **Modelos Toasty (`models.rs`):** Representam fielmente o esquema relacional do banco de dados,
+//!   anotados com macros procedurais (`#[derive(toasty::Model)]`).
+//! - **Conversões Desacopladas (`From` / `Into`):** As entidades de domínio (`domain/`) permanecem
+//!   puras e agnósticas ao banco. A conversão entre registros Toasty e estruturas de domínio ocorre
+//!   através de implementações explícitas de `From<*Record>`.
+//! - **Repositório [`Database`]:** Encapsula o `toasty::Db` em um wrapper seguro e thread-safe (`Clone`),
+//!   expondo operações CRUD e consultas analíticas de alto nível para a camada de apresentação (`api/`).
+//! - **Estratégia de Chaves Primárias:** O sistema adota **UUID v7** gerados via `Uuid::now_v7()`,
+//!   permitindo ordenação cronológica e extração do timestamp exato de criação sem depender de colunas
+//!   redundantes `created_at`.
+
 pub mod models;
 
 use chrono::Utc;
