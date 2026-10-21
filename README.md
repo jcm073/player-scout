@@ -107,10 +107,20 @@ player-scout/
 ├── CHANGELOG.md         # Histórico detalhado de mudanças e commits
 ├── README.md            # Esta documentação geral
 ├── docker-compose.yml   # PostgreSQL 18 e serviço MCP containerizado
+├── docs/                # Manuais técnicos e guias de arquitetura
+│   ├── ONBOARDING_JUNIOR.md        # Guia passo a passo de onboarding para novos desenvolvedores
+│   ├── MODULARIZACAO_WEB.md        # Documentação da arquitetura modular da camada Web (api::web)
+│   └── MIGRATIONS_E_TOASTY_ORM.md  # Manual de migrações SQL e persistência com Toasty ORM
 ├── migrations/          # Migrações relacionais do PostgreSQL
 ├── http/                # Scripts de teste interativo da API REST para o plugin REST Client
 └── rust/                # Backend em Rust (Axum, Toasty ORM, Domínio e Testes)
 ```
+
+## 📚 Documentação Técnica e Guias
+
+- 🐣 **[Guia de Onboarding para Desenvolvedores Juniores](docs/ONBOARDING_JUNIOR.md):** Ponto de partida ideal! Explica o glossário do Padel (21 golpes e matriz tática), setup do ambiente local, ciclo de vida das requisições HTMX e a "receita de bolo" em 5 passos para novas features.
+- 🌐 **[Arquitetura da Camada Web](docs/MODULARIZACAO_WEB.md):** Detalhamento dos 6 submódulos da interface (`auth`, `dashboard`, `court`, `matches`, `analytics`, `preferences`).
+- 💾 **[Migrações SQL e Toasty ORM](docs/MIGRATIONS_E_TOASTY_ORM.md):** Manual completo de modelagem relacional, catálogo de migrações e boas práticas com o Toasty ORM.
 
 ### 🧪 Executando os Testes da API
 

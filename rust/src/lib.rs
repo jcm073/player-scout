@@ -21,6 +21,12 @@
 //! - [`api::web::matches`]: Setup de nova partida, criação rápida de sparring (duplas) e finalização de jogo.
 //! - [`api::web::analytics`]: Fragmentos HTMX do painel analítico recursivo e comparação de sets lado a lado.
 //! - [`api::web::preferences`]: Formulários inline de atualização cadastral e rotação segura de senhas.
+//!
+//! ## Documentação Adicional do Repositório
+//! - **Onboarding para Novos Desenvolvedores:** Consulte `docs/ONBOARDING_JUNIOR.md` para o guia passo a passo,
+//!   glossário de Padel, arquitetura detalhada e ciclo de vida de requisições HTMX.
+//! - **Guia de Manutenção Web:** Consulte `docs/MODULARIZACAO_WEB.md` para aprofundar na organização de rotas e templates.
+//! - **Persistência e Migrações:** Consulte `docs/MIGRATIONS_E_TOASTY_ORM.md` para regras do Toasty ORM e PostgreSQL 18.
 
 pub mod api;
 pub mod config;

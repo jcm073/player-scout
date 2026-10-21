@@ -1,6 +1,9 @@
 # Arquitetura e Guia de Manutenção: Camada Web (`api::web`)
 
-Este documento serve como guia prático para desenvolvedores (especialmente iniciantes e juniores) entenderem como a camada Web do Player Scout está estruturada após a refatoração e como estendê-la com segurança.
+Este documento serve como guia prático para desenvolvedores entenderem como a camada Web do Player Scout está estruturada após a refatoração e como estendê-la com segurança.
+
+> [!TIP]
+> **Novo no projeto?** Recomendamos iniciar a leitura pelo [Guia de Onboarding para Desenvolvedores Juniores](ONBOARDING_JUNIOR.md), que introduz o glossário do Padel, a configuração do ambiente e a visão geral de todas as camadas.
 
 ---
 

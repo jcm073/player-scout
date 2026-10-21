@@ -1,6 +1,9 @@
 # Guia Técnico: Migrações SQL e Toasty ORM (PostgreSQL 18)
 
-Este documento é a referência central sobre como o **banco de dados relacional** e a **camada de persistência** do **Player Scout** funcionam. Ele foi elaborado especialmente para orientar desenvolvedores (inclusive juniores e novos membros da equipe) a evoluir esquemas, criar migrações e manipular o Toasty ORM com segurança e sem introduzir quebras.
+Este documento é a referência central sobre como o **banco de dados relacional** e a **camada de persistência** do **Player Scout** funcionam. Ele foi elaborado especialmente para orientar desenvolvedores a evoluir esquemas, criar migrações e manipular o Toasty ORM com segurança e sem introduzir quebras.
+
+> [!TIP]
+> **Novo no projeto?** Não deixe de conferir o [Guia de Onboarding para Desenvolvedores Juniores](ONBOARDING_JUNIOR.md) para aprender a configurar o PostgreSQL via Docker e entender o fluxo completo de ponta a ponta.
 
 ---
 
