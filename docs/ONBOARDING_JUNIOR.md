@@ -157,6 +157,11 @@ cargo run --manifest-path rust/Cargo.toml
 ```
 Acesse no seu navegador: **`http://localhost:3000`**.
 
+#### 6. Explorar a API via Swagger UI
+Com a aplicação em execução, você pode inspecionar e testar interativamente todos os endpoints REST de `/api/v1`:
+- 📖 **Swagger UI Interativo:** **`http://localhost:3000/swagger-ui/`**
+- 📄 **Especificação OpenAPI 3.1 JSON:** **`http://localhost:3000/api-docs/openapi.json`** (usado pelo time mobile para gerar automaticamente os modelos e clientes em Kotlin).
+
 ---
 
 ## 4. Mapa Mental da Arquitetura

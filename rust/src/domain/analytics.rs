@@ -8,7 +8,7 @@ use super::{DecisionQuality, ShotEvent, ShotOutcome, ShotType, SpecialTag};
 
 /// Escopo recursivo de filtragem para agregação analítica:
 /// Permite consultar desde a carreira inteira do atleta até um ano, mês, partida ou set específico.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct AnalyticsFilter {
     pub match_id: Option<Uuid>,
     pub set_number: Option<u8>,
@@ -43,7 +43,7 @@ impl AnalyticsFilter {
 }
 
 /// Matriz Tática de Ouro (Decisão × Execução em 4 quadrantes)
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct DecisionExecutionMatrix {
     /// Acertou + Decisão Boa (Jogada Ideal)
     pub hit_good: usize,
@@ -60,7 +60,7 @@ pub struct DecisionExecutionMatrix {
 }
 
 /// Estatística agregada de uma zona da quadra
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ZoneStat {
     pub total: usize,
     pub hits: usize,
@@ -70,7 +70,7 @@ pub struct ZoneStat {
 }
 
 /// Eficiência dividida pelas 3 grandes zonas do Padel
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ZoneMetrics {
     pub serve_return: ZoneStat,
     pub net_attack: ZoneStat,
@@ -78,7 +78,7 @@ pub struct ZoneMetrics {
 }
 
 /// Radar de Habilidades nas 6 fases fundamentais do Padel (0.0 a 100.0)
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct PadelRadarMetrics {
     /// 1. Consistência de Saque & Recepção
     pub serve_consistency_pct: f64,
@@ -95,7 +95,7 @@ pub struct PadelRadarMetrics {
 }
 
 /// Desempenho detalhado por tipo de golpe do Padel
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ShotTypeBreakdown {
     pub shot_type: ShotType,
     pub total: usize,
@@ -108,7 +108,7 @@ pub struct ShotTypeBreakdown {
 }
 
 /// Relatório Analítico Recursivo de um Atleta
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct PlayerAnalyticsReport {
     pub player_id: Uuid,
     pub scope: AnalyticsFilter,
@@ -131,7 +131,7 @@ pub struct PlayerAnalyticsReport {
 }
 
 /// Evolução por tipo de golpe entre dois escopos (B - A)
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ShotTypeComparisonDelta {
     pub shot_type: ShotType,
     pub total_a: usize,
@@ -143,7 +143,7 @@ pub struct ShotTypeComparisonDelta {
 }
 
 /// Deltas consolidados do Modo Comparativo Lado a Lado (Escopo B - Escopo A)
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ComparisonDeltas {
     /// Variação na taxa de acerto (B - A) em pontos percentuais
     pub hit_rate_delta_pct: f64,
@@ -160,7 +160,7 @@ pub struct ComparisonDeltas {
 }
 
 /// Relatório Comparativo Lado a Lado (Escopo A vs Escopo B)
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct AnalyticsComparisonReport {
     pub player_id: Uuid,
     pub scope_a: PlayerAnalyticsReport,

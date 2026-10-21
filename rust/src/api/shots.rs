@@ -10,13 +10,14 @@ use crate::{
     api::players::ActorQuery,
     db::{Database, NewShotInput},
     domain::{AuthenticatedUser, DecisionQuality, ShotEvent, ShotOutcome, ShotType, SpecialTag},
-    error::Result,
+    error::{ErrorResponse, Result},
 };
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, utoipa::ToSchema)]
 pub struct RecordShotRequest {
     pub actor_id: Uuid,
     pub player_id: Uuid,
+    #[schema(example = 1)]
     pub set_number: u8,
     pub shot_type: ShotType,
     pub outcome: ShotOutcome,
@@ -24,11 +25,25 @@ pub struct RecordShotRequest {
     pub special_tag: Option<SpecialTag>,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, utoipa::ToSchema)]
 pub struct UndoShotRequest {
     pub actor_id: Uuid,
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/matches/{id}/shots",
+    params(
+        ("id" = Uuid, Path, description = "UUID da partida")
+    ),
+    request_body = RecordShotRequest,
+    responses(
+        (status = 201, description = "Golpe registrado com sucesso", body = ShotEvent),
+        (status = 400, description = "Violação de regras de golpe (ex: Winner com Miss ou ENF com Hit)", body = ErrorResponse),
+        (status = 403, description = "Violação de BOLA ou perfil sem permissão de escrita", body = ErrorResponse)
+    ),
+    tag = "Shots"
+)]
 pub async fn record_shot(
     State(db): State<Database>,
     Extension(auth_user): Extension<AuthenticatedUser>,
@@ -54,6 +69,19 @@ pub async fn record_shot(
     Ok((StatusCode::CREATED, Json(shot)))
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/matches/{id}/shots",
+    params(
+        ("id" = Uuid, Path, description = "UUID da partida"),
+        ActorQuery
+    ),
+    responses(
+        (status = 200, description = "Lista ordenada de golpes da partida", body = Vec<ShotEvent>),
+        (status = 403, description = "Violação de BOLA ou sem acesso à partida", body = ErrorResponse)
+    ),
+    tag = "Shots"
+)]
 pub async fn list_shots(
     State(db): State<Database>,
     Extension(auth_user): Extension<AuthenticatedUser>,
@@ -65,6 +93,20 @@ pub async fn list_shots(
     Ok(Json(shots))
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/matches/{id}/shots/undo",
+    params(
+        ("id" = Uuid, Path, description = "UUID da partida")
+    ),
+    request_body = UndoShotRequest,
+    responses(
+        (status = 200, description = "Último golpe desfeito e removido com sucesso", body = ShotEvent),
+        (status = 400, description = "Nenhum golpe registrado para desfazer", body = ErrorResponse),
+        (status = 403, description = "Violação de BOLA", body = ErrorResponse)
+    ),
+    tag = "Shots"
+)]
 pub async fn undo_last_shot(
     State(db): State<Database>,
     Extension(auth_user): Extension<AuthenticatedUser>,

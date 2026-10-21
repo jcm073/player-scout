@@ -10,7 +10,9 @@ use uuid::Uuid;
 use super::{DomainError, DominantHand, PreferredSide, UserRole};
 
 /// Provedores OAuth2 suportados pelo Player Scout
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, toasty::Embed)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, toasty::Embed, utoipa::ToSchema,
+)]
 #[serde(rename_all = "snake_case")]
 #[column(type = enum("oauth_provider_enum"))]
 pub enum OAuthProvider {
@@ -73,7 +75,7 @@ impl OAuthProvider {
 }
 
 /// Conta OAuth2 vinculada a um usuário (Gmail, Microsoft Office ou Instagram)
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct UserOAuthAccount {
     pub id: Uuid,
     pub user_id: Uuid,
@@ -84,7 +86,7 @@ pub struct UserOAuthAccount {
 }
 
 /// Dados brutos enviados no cadastro de Player ou Coach
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct RegistrationInput {
     pub first_name: String,
     pub last_name: String,
@@ -273,7 +275,7 @@ pub const OAUTH_STATE_COOKIE_NAME: &str = "ps_oauth_state";
 pub const OAUTH_STATE_TTL_SECONDS: i64 = 600;
 
 /// Representa a sessão ativa única de um usuário autenticado (validade de 12 horas)
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct UserSession {
     pub id: Uuid,
     pub user_id: Uuid,
@@ -295,7 +297,7 @@ impl UserSession {
 }
 
 /// Contexto injetado pelo middleware nas requisições autenticadas
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct AuthenticatedUser {
     pub user: super::User,
     pub session: UserSession,

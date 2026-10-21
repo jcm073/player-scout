@@ -5,7 +5,9 @@ use uuid::Uuid;
 use super::DomainError;
 
 /// Catálogo Oficial com as 21 jogadas mapeadas no Padel
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, toasty::Embed)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, toasty::Embed, utoipa::ToSchema,
+)]
 #[serde(rename_all = "snake_case")]
 #[column(type = enum("shot_type_enum"))]
 pub enum ShotType {
@@ -188,7 +190,9 @@ impl ShotType {
 }
 
 /// Resultado obrigatório da execução do golpe
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, toasty::Embed)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, toasty::Embed, utoipa::ToSchema,
+)]
 #[serde(rename_all = "snake_case")]
 #[column(type = enum("shot_outcome_enum"))]
 pub enum ShotOutcome {
@@ -197,7 +201,18 @@ pub enum ShotOutcome {
 }
 
 /// Qualidade da decisão tática do jogador (Padrão: Good)
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, toasty::Embed)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Default,
+    Serialize,
+    Deserialize,
+    toasty::Embed,
+    utoipa::ToSchema,
+)]
 #[serde(rename_all = "snake_case")]
 #[column(type = enum("decision_quality_enum"))]
 pub enum DecisionQuality {
@@ -207,7 +222,9 @@ pub enum DecisionQuality {
 }
 
 /// Marcador especial opcional da jogada
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, toasty::Embed)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, toasty::Embed, utoipa::ToSchema,
+)]
 #[serde(rename_all = "snake_case")]
 #[column(type = enum("special_tag_enum"))]
 pub enum SpecialTag {
@@ -216,7 +233,7 @@ pub enum SpecialTag {
 }
 
 /// Evento atômico de uma jogada registrada em quadra
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ShotEvent {
     pub id: Uuid,
     pub match_id: Uuid,

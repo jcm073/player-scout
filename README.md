@@ -42,6 +42,7 @@ O projeto segue estritamente as diretrizes de arquitetura, segurança e convenç
   - Framework HTTP: [axum](https://github.com/tokio-rs/axum) (roteamento assíncrono e tratamento de requisições).
   - ORM / Acesso a Dados: [Toasty](https://github.com/tokio-rs/toasty) (ORM assíncrono do ecossistema Tokio para PostgreSQL).
   - Templates HTML Server-Side: [Askama](https://github.com/rinja-rs/askama) (templates compilados e type-safe).
+  - Especificação e Documentação da API: [utoipa](https://github.com/juhaku/utoipa) (OpenAPI 3.1 & Swagger UI integrado em `/swagger-ui/`).
 - **Banco de Dados:**
   - **PostgreSQL 18** ou superior, com constraints relacionais garantindo integridade das regras esportivas.
 - **Frontend Web:**
@@ -121,6 +122,7 @@ player-scout/
 - 🐣 **[Guia de Onboarding para Desenvolvedores Juniores](docs/ONBOARDING_JUNIOR.md):** Ponto de partida ideal! Explica o glossário do Padel (21 golpes e matriz tática), setup do ambiente local, ciclo de vida das requisições HTMX e a "receita de bolo" em 5 passos para novas features.
 - 🌐 **[Arquitetura da Camada Web](docs/MODULARIZACAO_WEB.md):** Detalhamento dos 6 submódulos da interface (`auth`, `dashboard`, `court`, `matches`, `analytics`, `preferences`).
 - 💾 **[Migrações SQL e Toasty ORM](docs/MIGRATIONS_E_TOASTY_ORM.md):** Manual completo de modelagem relacional, catálogo de migrações e boas práticas com o Toasty ORM.
+- 📖 **Swagger UI & OpenAPI 3.1 Spec:** Com a aplicação em execução, acesse `http://localhost:3000/swagger-ui/` para explorar e testar todos os endpoints REST interativamente, ou baixe o schema formal em `http://localhost:3000/api-docs/openapi.json` para geração automática de código Kotlin para o cliente móvel (Android/KMP).
 
 ### 🧪 Executando os Testes da API
 

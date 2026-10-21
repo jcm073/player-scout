@@ -9,13 +9,15 @@ use uuid::Uuid;
 use crate::{
     db::Database,
     domain::{AuthenticatedUser, User, UserRole},
-    error::{AppError, Result},
+    error::{AppError, ErrorResponse, Result},
 };
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, utoipa::ToSchema)]
 pub struct CreateUserRequest {
     pub role: UserRole,
+    #[schema(example = "Treinador Silva")]
     pub name: String,
+    #[schema(example = "treinador.silva@padel.com")]
     pub email: String,
     #[serde(default = "default_password_hash")]
     pub password_hash: String,
@@ -28,6 +30,17 @@ fn default_password_hash() -> String {
 /// Cria um usuário administrativo/interno (`POST /api/v1/users`)
 /// - Restrito a `Coach` e `Admin` (bloqueado para `Player` - LGPD / RBAC)
 /// - Apenas um `Admin` pode criar outro usuário com perfil `Admin`
+#[utoipa::path(
+    post,
+    path = "/api/v1/users",
+    request_body = CreateUserRequest,
+    responses(
+        (status = 201, description = "Usuário criado com sucesso", body = User),
+        (status = 400, description = "Dados cadastrais inválidos", body = ErrorResponse),
+        (status = 403, description = "Permissão insuficiente para criar o perfil solicitado", body = ErrorResponse)
+    ),
+    tag = "Users"
+)]
 pub async fn create_user(
     State(db): State<Database>,
     Extension(auth_user): Extension<AuthenticatedUser>,
@@ -54,6 +67,19 @@ pub async fn create_user(
 
 /// Consulta os dados cadastrais de um usuário (`GET /api/v1/users/{id}`)
 /// - Proteção LGPD / BOLA: um `Player` só pode consultar o seu próprio cadastro (`id == auth_user.user.id`)
+#[utoipa::path(
+    get,
+    path = "/api/v1/users/{id}",
+    params(
+        ("id" = Uuid, Path, description = "UUID do usuário")
+    ),
+    responses(
+        (status = 200, description = "Dados cadastrais do usuário", body = User),
+        (status = 403, description = "Acesso negado para consultar dados de terceiros (LGPD)", body = ErrorResponse),
+        (status = 404, description = "Usuário não encontrado", body = ErrorResponse)
+    ),
+    tag = "Users"
+)]
 pub async fn get_user(
     State(db): State<Database>,
     Extension(auth_user): Extension<AuthenticatedUser>,
@@ -71,6 +97,15 @@ pub async fn get_user(
 
 /// Lista todos os usuários cadastrados (`GET /api/v1/users`)
 /// - Proteção de privacidade (LGPD): restrito a `Coach` e `Admin`
+#[utoipa::path(
+    get,
+    path = "/api/v1/users",
+    responses(
+        (status = 200, description = "Lista de usuários cadastrados", body = Vec<User>),
+        (status = 403, description = "Acesso negado para perfil Player (LGPD)", body = ErrorResponse)
+    ),
+    tag = "Users"
+)]
 pub async fn list_users(
     State(db): State<Database>,
     Extension(auth_user): Extension<AuthenticatedUser>,
@@ -85,6 +120,19 @@ pub async fn list_users(
 ///   - Um `Player` só pode desativar a sua própria conta (`id == auth_user.user.id`)
 ///   - Um `Coach` pode desativar atletas ou a si próprio
 ///   - Um `Admin` pode desativar qualquer usuário
+#[utoipa::path(
+    delete,
+    path = "/api/v1/users/{id}",
+    params(
+        ("id" = Uuid, Path, description = "UUID do usuário a ser desativado")
+    ),
+    responses(
+        (status = 200, description = "Conta desativada com sucesso", body = User),
+        (status = 403, description = "Violação de permissão de acesso", body = ErrorResponse),
+        (status = 404, description = "Usuário não encontrado", body = ErrorResponse)
+    ),
+    tag = "Users"
+)]
 pub async fn deactivate_user(
     State(db): State<Database>,
     Extension(auth_user): Extension<AuthenticatedUser>,
@@ -110,6 +158,19 @@ pub async fn deactivate_user(
 
 /// Reativa logicamente uma conta desativada (`POST /api/v1/users/{id}/reactivate`)
 /// - Restrito a Administradores (Admin) e Treinadores (Coach)
+#[utoipa::path(
+    post,
+    path = "/api/v1/users/{id}/reactivate",
+    params(
+        ("id" = Uuid, Path, description = "UUID do usuário a ser reativado")
+    ),
+    responses(
+        (status = 200, description = "Conta reativada com sucesso", body = User),
+        (status = 403, description = "Acesso negado para reativação de contas", body = ErrorResponse),
+        (status = 404, description = "Usuário não encontrado", body = ErrorResponse)
+    ),
+    tag = "Users"
+)]
 pub async fn reactivate_user(
     State(db): State<Database>,
     Extension(auth_user): Extension<AuthenticatedUser>,
