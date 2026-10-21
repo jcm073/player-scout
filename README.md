@@ -97,6 +97,22 @@ Adicione a configuração no seu cliente MCP / VSCode para inspecionar o banco d
 }
 ```
 
+### 4. Popular o Banco com Dados de Demonstração (Seed)
+Popule o banco local em 2 segundos com um treinador demonstrativo, 4 atletas de padel e partidas gravadas:
+```bash
+make seed
+# Ou: cargo run --bin seed --manifest-path rust/Cargo.toml
+```
+> **Credenciais de teste geradas:**  
+> - **Treinador:** `treinador@padel.com` | **Senha:** `PadelScout#2026`
+
+### 5. Iniciar a Aplicação
+```bash
+make dev
+# Ou: cargo run --manifest-path rust/Cargo.toml
+```
+Acesse no seu navegador: **`http://localhost:3000/web/login`** ou explore a API em **`http://localhost:3000/swagger-ui/`**.
+
 ---
 
 ## 📁 Estrutura do Repositório

@@ -15,6 +15,7 @@ Este arquivo é a fonte oficial do estado de evolução do projeto. Toda fase e 
 | **Fase 4** | Frontend Web (Askama, HTMX 4.x, Chart.js & Mobile Touch) | **Concluído** | 100% |
 | **Fase 4.5** | Autenticação, Cadastro Completo, Hash Argon2i & OAuth2 | **Concluído** | 100% |
 | **Fase 4.8** | Hub do Treinador, Ingestão Multi-Atletas (1 Clique) & match_players | **Concluído** | 100% |
+| **Fase 4.9** | OpenAPI 3.1 (Swagger UI), Onboarding Júnior & Refatoração DX/Performance | **Concluído** | 100% |
 | **Fase 5** | Clientes Móveis (Kotlin / KMP para Android e iOS) | **Pendente** | 0% |
 | **Fase 6** | Testes Automatizados 100% em Rust, CI/CD & Auditoria | **Em Andamento** | 90% |
 
@@ -175,6 +176,23 @@ Este arquivo é a fonte oficial do estado de evolução do projeto. Toda fase e 
 - [x] Dashboard Pós-Partida com botão de destaque `⚡ Nova Partida` direcionando para diálogo de escolha (mesmos atletas ou nova escalação).
 - [x] Cadastro rápido de Sparring / Atleta Convidado (sem formulários longos).
 - [x] Suíte de testes automatizados 100% em Rust cobrindo todo o fluxo multi-atleta e persistência `match_players`.
+
+---
+
+### Fase 4.9: OpenAPI 3.1 (Swagger UI), Onboarding Júnior & Refatoração DX/Performance
+- [x] **Modularização da Camada Web (`api::web`):**
+  - Desacoplamento do antigo `web.rs` em 6 submódulos especializados (`auth`, `dashboard`, `court`, `matches`, `analytics`, `preferences`).
+  - Criação da documentação arquitetural em [`docs/MODULARIZACAO_WEB.md`](file:///home/jc/codigos/rust/player-scout/docs/MODULARIZACAO_WEB.md).
+- [x] **Manual Técnico de Migrações SQL & Toasty ORM:**
+  - Catálogo formal das 7 migrações em [`docs/MIGRATIONS_E_TOASTY_ORM.md`](file:///home/jc/codigos/rust/player-scout/docs/MIGRATIONS_E_TOASTY_ORM.md).
+  - Docstrings de módulo e crate para mapeamento relacional e repositório.
+- [x] **Guia Passo a Passo de Onboarding para Desenvolvedores Juniores:**
+  - Publicação de [`docs/ONBOARDING_JUNIOR.md`](file:///home/jc/codigos/rust/player-scout/docs/ONBOARDING_JUNIOR.md) com glossário de Padel, Matriz de Ouro, setup local e ciclo de vida HTMX.
+  - Referências cruzadas no `README.md`, `rust/src/lib.rs` e documentações técnicas.
+- [x] **OpenAPI 3.1 & Swagger UI (`utoipa` v5.5 + `utoipa-swagger-ui` v9.0):**
+  - Exposição de interface Swagger interativa em `GET /swagger-ui/` e schema em `GET /api-docs/openapi.json`.
+  - Anotação `#[derive(utoipa::ToSchema)]` e `#[utoipa::path]` em 26 endpoints REST cobrindo 100% dos fluxos.
+  - Teste automatizado de integração de contratos e respostas de documentação.
 
 ---
 
