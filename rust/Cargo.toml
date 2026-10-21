@@ -45,6 +45,10 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 dotenvy = "0.15"
 
+# OpenAPI 3.1 & Swagger UI (Geração de Contratos para Clientes Móveis)
+utoipa = { version = "5.5", features = ["axum_extras", "chrono", "uuid"] }
+utoipa-swagger-ui = { version = "9.0", features = ["axum"] }
+
 [dev-dependencies]
 tokio-test = "0.4"
 

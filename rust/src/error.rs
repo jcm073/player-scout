@@ -51,9 +51,11 @@ impl From<askama::Error> for AppError {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ErrorResponse {
+    #[schema(example = "Recurso não encontrado")]
     pub error: String,
+    #[schema(example = "NOT_FOUND")]
     pub code: String,
 }
 

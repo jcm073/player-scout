@@ -10,17 +10,30 @@ use crate::{
     api::players::ActorQuery,
     db::Database,
     domain::{AuthenticatedUser, MatchSession},
-    error::Result,
+    error::{ErrorResponse, Result},
 };
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, utoipa::ToSchema)]
 pub struct CreateMatchRequest {
     pub actor_id: Uuid,
     pub player_id: Uuid,
+    #[schema(example = "Dupla Rival")]
     pub opponent_name: Option<String>,
+    #[schema(example = "Final do torneio regional")]
     pub notes: Option<String>,
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/matches",
+    request_body = CreateMatchRequest,
+    responses(
+        (status = 201, description = "Partida criada com sucesso", body = MatchSession),
+        (status = 400, description = "Dados da partida inválidos", body = ErrorResponse),
+        (status = 403, description = "Violação de BOLA ou permissão insuficiente", body = ErrorResponse)
+    ),
+    tag = "Matches"
+)]
 pub async fn create_match(
     State(db): State<Database>,
     Extension(auth_user): Extension<AuthenticatedUser>,
@@ -39,6 +52,20 @@ pub async fn create_match(
     Ok((StatusCode::CREATED, Json(session)))
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/matches/{id}",
+    params(
+        ("id" = Uuid, Path, description = "UUID da partida"),
+        ActorQuery
+    ),
+    responses(
+        (status = 200, description = "Dados detalhados da sessão de partida", body = MatchSession),
+        (status = 403, description = "Violação de BOLA ou sem acesso ao jogador da partida", body = ErrorResponse),
+        (status = 404, description = "Partida não encontrada", body = ErrorResponse)
+    ),
+    tag = "Matches"
+)]
 pub async fn get_match(
     State(db): State<Database>,
     Extension(auth_user): Extension<AuthenticatedUser>,

@@ -16,52 +16,61 @@ use crate::{
         UserSession, extract_bearer_token, extract_oauth_state_from_cookie,
         extract_session_token_from_cookie,
     },
-    error::{AppError, Result},
+    error::{AppError, ErrorResponse, Result},
 };
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct AuthResponse {
     pub user: User,
     pub player_profile: Option<Player>,
+    #[schema(example = "ps_sess_018d0f73_abcdef123456...")]
     pub session_token: String,
     pub session: UserSession,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct LogoutResponse {
     pub revoked: bool,
+    #[schema(example = "Sessão encerrada e token excluído com sucesso.")]
     pub message: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct LoginRequest {
+    #[schema(example = "treinador@padel.com")]
     pub email: String,
+    #[schema(example = "SenhaForte#2026")]
     pub password: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ChangePasswordRequest {
+    #[schema(example = "SenhaAtual#1234")]
     pub current_password: String,
+    #[schema(example = "NovaSenhaForte#2026")]
     pub new_password: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ChangePasswordResponse {
     pub user: User,
+    #[schema(example = "ps_sess_018d0f73_rotacionada...")]
     pub session_token: String,
     pub session: UserSession,
+    #[schema(example = "Senha atualizada com hash Argon2i e sessão rotacionada com sucesso.")]
     pub message: String,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, utoipa::IntoParams)]
 pub struct UserLookupQuery {
     pub email: Option<String>,
     pub cpf: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct OAuthAuthorizeResponse {
     pub provider: OAuthProvider,
+    #[schema(example = "Google (Gmail)")]
     pub provider_name: String,
     pub authorize_url: String,
     pub token_url: String,
@@ -71,26 +80,31 @@ pub struct OAuthAuthorizeResponse {
     pub client_secret_configured: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct OAuthCallbackRequest {
     pub user_id: Uuid,
+    #[schema(example = "google-user-12345")]
     pub provider_user_id: String,
+    #[schema(example = "treinador@gmail.com")]
     pub provider_email: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct OAuthLoginRequest {
+    #[schema(example = "google-user-12345")]
     pub provider_user_id: String,
+    #[schema(example = "treinador@gmail.com")]
     pub provider_email: String,
     pub state: Option<String>,
     pub code: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct OAuthLoginResponse {
     pub user: User,
     pub player_profile: Option<Player>,
     pub oauth_account: UserOAuthAccount,
+    #[schema(example = "ps_sess_018d0f73_oauth...")]
     pub session_token: String,
     pub session: UserSession,
 }
@@ -259,6 +273,18 @@ pub fn append_security_headers(headers: &mut HeaderMap) {
 /// - Aplica hash Argon2i na senha (mínimo de 12 caracteres, 1 maiúscula, 1 minúscula, 1 número e 1 especial)
 /// - Cria automaticamente o perfil de atleta em `players` quando `role == player`
 /// - Já cria uma sessão única autenticada de 12 horas com hash Argon2i
+#[utoipa::path(
+    post,
+    path = "/api/v1/auth/register",
+    request_body = RegistrationInput,
+    responses(
+        (status = 201, description = "Usuário cadastrado com sucesso e sessão emitida", body = AuthResponse),
+        (status = 400, description = "Dados cadastrais inválidos", body = ErrorResponse),
+        (status = 409, description = "CPF ou e-mail já cadastrado", body = ErrorResponse),
+        (status = 422, description = "Tentativa de auto-cadastro como Administrador", body = ErrorResponse)
+    ),
+    tag = "Auth"
+)]
 pub async fn register(
     State(db): State<Database>,
     Json(payload): Json<RegistrationInput>,
@@ -291,6 +317,17 @@ pub async fn register(
 /// - Mitiga enumeração por Timing Attack com `verify_dummy_password_argon2i`
 /// - Verifica a senha contra o hash Argon2i armazenado no banco de dados
 /// - Cria sessão única de 12 horas (revogando qualquer sessão anterior do mesmo usuário)
+#[utoipa::path(
+    post,
+    path = "/api/v1/auth/login",
+    request_body = LoginRequest,
+    responses(
+        (status = 200, description = "Login realizado com sucesso e sessão emitida", body = AuthResponse),
+        (status = 401, description = "Credenciais inválidas", body = ErrorResponse),
+        (status = 429, description = "Conta temporariamente bloqueada por tentativas consecutivas", body = ErrorResponse)
+    ),
+    tag = "Auth"
+)]
 pub async fn login(
     State(db): State<Database>,
     Json(payload): Json<LoginRequest>,
@@ -321,6 +358,14 @@ pub async fn login(
 
 /// Endpoint de Logoff (`POST /api/v1/auth/logout`)
 /// - Exclui fisicamente (`DELETE`) o token da sessão no banco de dados e limpa o cookie
+#[utoipa::path(
+    post,
+    path = "/api/v1/auth/logout",
+    responses(
+        (status = 200, description = "Sessão encerrada com sucesso", body = LogoutResponse)
+    ),
+    tag = "Auth"
+)]
 pub async fn logout(State(db): State<Database>, headers: HeaderMap) -> Result<Response> {
     let revoked = if let Some(raw_token) = extract_token_from_headers(&headers) {
         db.revoke_session_by_token(&raw_token).await?
@@ -347,6 +392,15 @@ pub async fn logout(State(db): State<Database>, headers: HeaderMap) -> Result<Re
 }
 
 /// Endpoint de Inspeção da Sessão Atual (`GET /api/v1/auth/session`)
+#[utoipa::path(
+    get,
+    path = "/api/v1/auth/session",
+    responses(
+        (status = 200, description = "Dados da sessão ativa do usuário autenticado", body = AuthenticatedUser),
+        (status = 401, description = "Sessão ausente ou expirada", body = ErrorResponse)
+    ),
+    tag = "Auth"
+)]
 pub async fn session_status(
     Extension(auth_user): Extension<AuthenticatedUser>,
 ) -> Result<Json<AuthenticatedUser>> {
@@ -357,6 +411,17 @@ pub async fn session_status(
 /// - Verifica a `current_password` usando `Argon2i`
 /// - Valida e aplica hash `Argon2i` na `new_password`
 /// - Exclui a sessão atual e emite um novo token único de 12 horas
+#[utoipa::path(
+    post,
+    path = "/api/v1/auth/password",
+    request_body = ChangePasswordRequest,
+    responses(
+        (status = 200, description = "Senha atualizada com sucesso e nova sessão emitida", body = ChangePasswordResponse),
+        (status = 400, description = "Nova senha não atende aos requisitos de complexidade", body = ErrorResponse),
+        (status = 401, description = "Senha atual incorreta", body = ErrorResponse)
+    ),
+    tag = "Auth"
+)]
 pub async fn change_password(
     State(db): State<Database>,
     Extension(auth_user): Extension<AuthenticatedUser>,
@@ -393,6 +458,17 @@ pub async fn change_password(
 
 /// Endpoint de Busca de Usuário por Chave Única (`CPF` ou `Email`) (`GET /api/v1/auth/lookup`)
 /// - Proteção de Privacidade / LGPD: restrito a `Coach` e `Admin` (bloqueado para `Player`)
+#[utoipa::path(
+    get,
+    path = "/api/v1/auth/lookup",
+    params(UserLookupQuery),
+    responses(
+        (status = 200, description = "Usuário localizado", body = User),
+        (status = 403, description = "Acesso negado para perfil Player", body = ErrorResponse),
+        (status = 404, description = "Usuário não encontrado", body = ErrorResponse)
+    ),
+    tag = "Auth"
+)]
 pub async fn lookup_user(
     State(db): State<Database>,
     Extension(auth_user): Extension<AuthenticatedUser>,
@@ -408,6 +484,17 @@ pub async fn lookup_user(
 /// Endpoint de Início do Fluxo OAuth2 (`GET /api/v1/auth/oauth/{provider}/authorize`)
 /// Suporta `google` (Gmail), `microsoft` (Microsoft Office) e `instagram`.
 /// Emite o cookie HttpOnly Anti-CSRF `ps_oauth_state` (validade: 10 minutos).
+#[utoipa::path(
+    get,
+    path = "/api/v1/auth/oauth/{provider}/authorize",
+    params(
+        ("provider" = OAuthProvider, Path, description = "Provedor OAuth2 (google, microsoft ou instagram)")
+    ),
+    responses(
+        (status = 200, description = "URL de autorização OAuth2 e metadados de configuração", body = OAuthAuthorizeResponse)
+    ),
+    tag = "OAuth2"
+)]
 pub async fn oauth_authorize(Path(provider): Path<OAuthProvider>) -> Result<Response> {
     let env_prefix = match provider {
         OAuthProvider::Google => "OAUTH_GOOGLE",
@@ -467,6 +554,19 @@ pub async fn oauth_authorize(Path(provider): Path<OAuthProvider>) -> Result<Resp
 /// - Valida o parâmetro Anti-CSRF `state` contra o cookie `ps_oauth_state` (quando presente)
 /// - Localiza ou vincula a conta OAuth2 ao usuário cadastrado pelo e-mail verificado
 /// - Emite o token de sessão única de 12 horas (`ps_sess_...` com hash Argon2i), substituindo sessões anteriores
+#[utoipa::path(
+    post,
+    path = "/api/v1/auth/oauth/{provider}/login",
+    params(
+        ("provider" = OAuthProvider, Path, description = "Provedor OAuth2 (google, microsoft ou instagram)")
+    ),
+    request_body = OAuthLoginRequest,
+    responses(
+        (status = 200, description = "Autenticação social realizada com sucesso e sessão emitida", body = OAuthLoginResponse),
+        (status = 403, description = "Falha de validação Anti-CSRF ou estado inválido", body = ErrorResponse)
+    ),
+    tag = "OAuth2"
+)]
 pub async fn oauth_login(
     State(db): State<Database>,
     headers: HeaderMap,
@@ -515,6 +615,19 @@ pub async fn oauth_login(
 }
 
 /// Endpoint Protegido de Vínculo Manual OAuth2 (`POST /api/v1/auth/oauth/{provider}/callback`)
+#[utoipa::path(
+    post,
+    path = "/api/v1/auth/oauth/{provider}/callback",
+    params(
+        ("provider" = OAuthProvider, Path, description = "Provedor OAuth2 (google, microsoft ou instagram)")
+    ),
+    request_body = OAuthCallbackRequest,
+    responses(
+        (status = 201, description = "Conta OAuth2 vinculada ao usuário", body = UserOAuthAccount),
+        (status = 403, description = "Violação de BOLA ou permissão insuficiente", body = ErrorResponse)
+    ),
+    tag = "OAuth2"
+)]
 pub async fn oauth_callback(
     State(db): State<Database>,
     Extension(auth_user): Extension<AuthenticatedUser>,

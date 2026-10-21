@@ -13,8 +13,111 @@ use axum::{
 };
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
+use utoipa::OpenApi;
+use utoipa_swagger_ui::SwaggerUi;
 
 use crate::db::Database;
+
+#[derive(OpenApi)]
+#[openapi(
+    paths(
+        health::health_check,
+        auth::register,
+        auth::login,
+        auth::logout,
+        auth::session_status,
+        auth::change_password,
+        auth::lookup_user,
+        auth::oauth_authorize,
+        auth::oauth_login,
+        auth::oauth_callback,
+        users::create_user,
+        users::get_user,
+        users::list_users,
+        users::deactivate_user,
+        users::reactivate_user,
+        players::create_player,
+        players::list_players,
+        players::get_player,
+        players::assign_coach,
+        players::list_player_coaches,
+        matches::create_match,
+        matches::get_match,
+        shots::record_shot,
+        shots::list_shots,
+        shots::undo_last_shot,
+        analytics::get_player_analytics,
+        analytics::compare_analytics,
+    ),
+    components(
+        schemas(
+            crate::error::ErrorResponse,
+            health::HealthStatus,
+            auth::AuthResponse,
+            auth::LogoutResponse,
+            auth::LoginRequest,
+            auth::ChangePasswordRequest,
+            auth::ChangePasswordResponse,
+            auth::OAuthAuthorizeResponse,
+            auth::OAuthCallbackRequest,
+            auth::OAuthLoginRequest,
+            auth::OAuthLoginResponse,
+            users::CreateUserRequest,
+            players::CreatePlayerRequest,
+            players::AssignCoachRequest,
+            matches::CreateMatchRequest,
+            shots::RecordShotRequest,
+            shots::UndoShotRequest,
+            analytics::CompareAnalyticsRequest,
+            crate::domain::User,
+            crate::domain::UserRole,
+            crate::domain::UserSession,
+            crate::domain::RegistrationInput,
+            crate::domain::OAuthProvider,
+            crate::domain::UserOAuthAccount,
+            crate::domain::AuthenticatedUser,
+            crate::domain::Player,
+            crate::domain::DominantHand,
+            crate::domain::PreferredSide,
+            crate::domain::CoachPlayer,
+            crate::domain::MatchSession,
+            crate::domain::MatchStatus,
+            crate::domain::MatchTeam,
+            crate::domain::MatchPlayer,
+            crate::domain::ShotEvent,
+            crate::domain::ShotType,
+            crate::domain::ShotOutcome,
+            crate::domain::DecisionQuality,
+            crate::domain::SpecialTag,
+            crate::domain::AnalyticsFilter,
+            crate::domain::DecisionExecutionMatrix,
+            crate::domain::ZoneStat,
+            crate::domain::ZoneMetrics,
+            crate::domain::PadelRadarMetrics,
+            crate::domain::ShotTypeBreakdown,
+            crate::domain::PlayerAnalyticsReport,
+            crate::domain::ShotTypeComparisonDelta,
+            crate::domain::ComparisonDeltas,
+            crate::domain::AnalyticsComparisonReport,
+        )
+    ),
+    tags(
+        (name = "Health", description = "Monitoramento e status de integridade do serviço"),
+        (name = "Auth", description = "Autenticação, sessões de 12h (Argon2i), cadastro e segurança"),
+        (name = "OAuth2", description = "Login Social e vinculação de contas (Google, Microsoft, Instagram)"),
+        (name = "Users", description = "Gestão de usuários, perfis de acesso e desativação/reativação"),
+        (name = "Players", description = "Gestão de atletas, preferências de quadra e vínculos com treinadores"),
+        (name = "Matches", description = "Setup de partidas de padel e acompanhamento de jogos"),
+        (name = "Shots", description = "Ingestão e scouting de golpes em tempo real na quadra (21 golpes)"),
+        (name = "Analytics", description = "Relatórios analíticos recursivos e comparativo lado a lado")
+    ),
+    info(
+        title = "Player Scout API",
+        version = "0.1.0",
+        description = "API REST oficial do Player Scout para scouting em quadra, relatórios analíticos e integração com o aplicativo móvel Android/iOS em Kotlin."
+    )
+)]
+pub struct ApiDoc;
 
 pub fn app_router(db: Database) -> Router {
     let cors = CorsLayer::new()
@@ -24,6 +127,7 @@ pub fn app_router(db: Database) -> Router {
 
     // Rotas públicas (Login, Cadastro, OAuth2 Authorize, Logoff e Healthcheck)
     let public_routes = Router::new()
+        .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
         .route("/health", get(health::health_check))
         .route("/api/v1/health", get(health::health_check))
         .route("/web/login", get(web::login_page).post(web::web_login))

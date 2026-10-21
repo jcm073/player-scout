@@ -3,7 +3,9 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, toasty::Embed)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, toasty::Embed, utoipa::ToSchema,
+)]
 #[serde(rename_all = "snake_case")]
 #[column(type = enum("match_status_enum"))]
 pub enum MatchStatus {
@@ -12,7 +14,7 @@ pub enum MatchStatus {
     Canceled,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum MatchTeam {
     TeamA,
@@ -46,7 +48,7 @@ impl std::str::FromStr for MatchTeam {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct MatchPlayer {
     pub match_id: Uuid,
     pub player_id: Uuid,
@@ -56,7 +58,7 @@ pub struct MatchPlayer {
     pub created_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct MatchSession {
     pub id: Uuid,
     pub coach_id: Uuid,

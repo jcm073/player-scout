@@ -4,7 +4,9 @@ use uuid::Uuid;
 
 use super::PreferredSide;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, toasty::Embed)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, toasty::Embed, utoipa::ToSchema,
+)]
 #[serde(rename_all = "snake_case")]
 #[column(type = enum("user_role_enum"))]
 pub enum UserRole {
@@ -45,7 +47,7 @@ impl UserRole {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct User {
     pub id: Uuid,
     pub role: UserRole,

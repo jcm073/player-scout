@@ -4,7 +4,18 @@ use uuid::Uuid;
 
 use super::DomainError;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, toasty::Embed)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Default,
+    Serialize,
+    Deserialize,
+    toasty::Embed,
+    utoipa::ToSchema,
+)]
 #[serde(rename_all = "snake_case")]
 #[column(type = enum("dominant_hand_enum"))]
 pub enum DominantHand {
@@ -13,7 +24,18 @@ pub enum DominantHand {
     LeftHanded,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, toasty::Embed)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Default,
+    Serialize,
+    Deserialize,
+    toasty::Embed,
+    utoipa::ToSchema,
+)]
 #[serde(rename_all = "snake_case")]
 #[column(type = enum("preferred_side_enum"))]
 pub enum PreferredSide {
@@ -42,7 +64,7 @@ impl PreferredSide {
 }
 
 /// Perfil do Atleta no Player Scout
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct Player {
     pub id: Uuid,
     /// Vínculo opcional com a conta de usuário (UserRole::Player) para acesso read-only ao dashboard
@@ -92,7 +114,7 @@ impl Player {
 
 /// Associação N:N entre Treinador e Jogador
 /// Permite que um mesmo jogador treine com múltiplos treinadores (ex: técnico, físico e tático)
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct CoachPlayer {
     pub coach_id: Uuid,
     pub player_id: Uuid,

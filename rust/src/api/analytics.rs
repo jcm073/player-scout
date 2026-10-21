@@ -11,10 +11,10 @@ use crate::{
     domain::{
         AnalyticsComparisonReport, AnalyticsFilter, AuthenticatedUser, PlayerAnalyticsReport,
     },
-    error::Result,
+    error::{ErrorResponse, Result},
 };
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, utoipa::IntoParams)]
 pub struct PlayerAnalyticsQuery {
     pub actor_id: Uuid,
     pub match_id: Option<Uuid>,
@@ -23,7 +23,7 @@ pub struct PlayerAnalyticsQuery {
     pub to_date: Option<DateTime<Utc>>,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, utoipa::ToSchema)]
 pub struct CompareAnalyticsRequest {
     pub actor_id: Uuid,
     pub player_id: Uuid,
@@ -33,6 +33,20 @@ pub struct CompareAnalyticsRequest {
 
 /// Endpoint de Agregação Recursiva:
 /// `GET /api/v1/analytics/players/{id}` com filtros opcionais (`match_id`, `set_number`, `from_date`, `to_date`)
+#[utoipa::path(
+    get,
+    path = "/api/v1/analytics/players/{id}",
+    params(
+        ("id" = Uuid, Path, description = "UUID do atleta"),
+        PlayerAnalyticsQuery
+    ),
+    responses(
+        (status = 200, description = "Relatório analítico do atleta no escopo especificado", body = PlayerAnalyticsReport),
+        (status = 403, description = "Violação de BOLA ou sem acesso ao atleta", body = ErrorResponse),
+        (status = 404, description = "Atleta não encontrado", body = ErrorResponse)
+    ),
+    tag = "Analytics"
+)]
 pub async fn get_player_analytics(
     State(db): State<Database>,
     Extension(auth_user): Extension<AuthenticatedUser>,
@@ -56,6 +70,16 @@ pub async fn get_player_analytics(
 
 /// Endpoint de Modo Comparativo Lado a Lado:
 /// `POST /api/v1/analytics/compare` comparando Escopo A vs Escopo B com cálculo de deltas (B - A)
+#[utoipa::path(
+    post,
+    path = "/api/v1/analytics/compare",
+    request_body = CompareAnalyticsRequest,
+    responses(
+        (status = 200, description = "Relatório comparativo lado a lado com deltas pareados", body = AnalyticsComparisonReport),
+        (status = 403, description = "Violação de BOLA ou sem acesso ao atleta", body = ErrorResponse)
+    ),
+    tag = "Analytics"
+)]
 pub async fn compare_analytics(
     State(db): State<Database>,
     Extension(auth_user): Extension<AuthenticatedUser>,
