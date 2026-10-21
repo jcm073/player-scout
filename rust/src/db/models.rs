@@ -1,3 +1,16 @@
+//! # Modelos de Dados Toasty ORM
+//!
+//! Este arquivo contém as definições das tabelas e esquemas relacionais gerenciados pelo **Toasty ORM**.
+//! Cada struct anotada com `#[derive(toasty::Model)]` mapeia uma tabela física do PostgreSQL 18.
+//!
+//! ## Convenções de Mapeamento:
+//! - `#[table = "..."]`: Nome da tabela física no banco.
+//! - `#[key] #[auto]`: Define a chave primária UUID (gerada automaticamente se não fornecida).
+//! - `#[key(partition = ..., local = ...)]`: Define chave primária composta (tabelas associativas N:N).
+//! - `#[unique]`: Cria restrição única no banco (ex: CPF, e-mail, sessão por usuário).
+//! - `#[index]`: Cria índice relacional para otimização de consultas (ex: chaves estrangeiras).
+//! - `timestamp_from_uuid(&id)`: Extrai o momento exato de criação do cabeçalho do UUID v7.
+
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
